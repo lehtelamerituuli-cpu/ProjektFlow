@@ -120,19 +120,27 @@ export default function Projects() {
   const [editDeadline, setEditDeadline] = useState('')
   const [editBudget, setEditBudget] = useState('')
   const [localNotes, setLocalNotes] = useState<Record<string, string>>({})
+  const [isOwner, setIsOwner] = useState(true)
   const isMobile = useIsMobile()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.push('/login'); return }
       setUser(data.user)
+      const session = await supabase.auth.getSession()
+      const tok = session.data.session?.access_token
+      if (tok) {
+        const res = await fetch('/api/team', { headers: { Authorization: `Bearer ${tok}` } })
+        const teamData = await res.json()
+        if (teamData.membership && teamData.membership.role !== 'owner') setIsOwner(false)
+      }
       loadAll(data.user.id)
     })
   }, [])
 
   async function loadAll(uid: string) {
     const [{ data: p }, { data: t }, { data: tr }, { data: ex }] = await Promise.all([
-      supabase.from('projects').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('time_entries').select('*').eq('user_id', uid),
       supabase.from('travel_entries').select('*').eq('user_id', uid),
       supabase.from('expenses').select('*').eq('user_id', uid),
@@ -391,9 +399,11 @@ export default function Projects() {
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'visible' }}>
           <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text-heading)' }}>Projektit yhteenveto</h2>
-            <button onClick={() => setShowForm(v => !v)} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              + Uusi projekti
-            </button>
+            {isOwner && (
+              <button onClick={() => setShowForm(v => !v)} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                + Uusi projekti
+              </button>
+            )}
           </div>
           {projects.length === 0 ? (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--faint)', fontSize: 14 }}>Ei projekteja vielä. Lisää ensimmäinen projekti!</div>
@@ -467,41 +477,43 @@ export default function Projects() {
                         </span>
                       ) : <span style={{ color: 'var(--faint)' }}>—</span>}
                     </td>
-                    <td style={{ padding: '14px 18px', width: 48 }}>
-                      <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => setActiveMenu(activeMenu === p.id ? null : p.id)}
-                          style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', padding: '5px 7px', borderRadius: 7, display: 'flex', alignItems: 'center' }}
-                          onMouseOver={e => (e.currentTarget.style.background = 'var(--border)')}
-                          onMouseOut={e => (e.currentTarget.style.background = 'none')}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-                        </button>
-                        {activeMenu === p.id && (
-                          <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 200, background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, padding: 6, minWidth: 160, boxShadow: '0 12px 32px rgba(0,0,0,0.3)' }}>
-                            <button
-                              onClick={() => openEdit(p)}
-                              style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text-soft)', fontSize: 13, cursor: 'pointer', padding: '8px 12px', borderRadius: 7, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
-                              onMouseOver={e => (e.currentTarget.style.background = 'var(--border)')}
-                              onMouseOut={e => (e.currentTarget.style.background = 'none')}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                              Muokkaa
-                            </button>
-                            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                            <button
-                              onClick={() => deleteProject(p.id)}
-                              style={{ width: '100%', background: 'none', border: 'none', color: '#f87171', fontSize: 13, cursor: 'pointer', padding: '8px 12px', borderRadius: 7, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
-                              onMouseOver={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}
-                              onMouseOut={e => (e.currentTarget.style.background = 'none')}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                              Poista projekti
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
+                    {isOwner && (
+                      <td style={{ padding: '14px 18px', width: 48 }}>
+                        <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => setActiveMenu(activeMenu === p.id ? null : p.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', padding: '5px 7px', borderRadius: 7, display: 'flex', alignItems: 'center' }}
+                            onMouseOver={e => (e.currentTarget.style.background = 'var(--border)')}
+                            onMouseOut={e => (e.currentTarget.style.background = 'none')}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                          </button>
+                          {activeMenu === p.id && (
+                            <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 200, background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, padding: 6, minWidth: 160, boxShadow: '0 12px 32px rgba(0,0,0,0.3)' }}>
+                              <button
+                                onClick={() => openEdit(p)}
+                                style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text-soft)', fontSize: 13, cursor: 'pointer', padding: '8px 12px', borderRadius: 7, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
+                                onMouseOver={e => (e.currentTarget.style.background = 'var(--border)')}
+                                onMouseOut={e => (e.currentTarget.style.background = 'none')}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Muokkaa
+                              </button>
+                              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                              <button
+                                onClick={() => deleteProject(p.id)}
+                                style={{ width: '100%', background: 'none', border: 'none', color: '#f87171', fontSize: 13, cursor: 'pointer', padding: '8px 12px', borderRadius: 7, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
+                                onMouseOver={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}
+                                onMouseOut={e => (e.currentTarget.style.background = 'none')}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                Poista projekti
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
