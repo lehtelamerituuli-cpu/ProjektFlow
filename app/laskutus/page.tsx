@@ -201,7 +201,7 @@ export default function Laskutus() {
         doc.setPage(i)
         doc.setDrawColor(200, 185, 240); doc.line(20, 278, 190, 278)
         doc.setFontSize(8); doc.setTextColor(150, 150, 175)
-        doc.text('Luotu FreelanceHub-sovelluksella', 105, 284, { align: 'center' })
+        doc.text('Luotu ProjektFlow-sovelluksella', 105, 284, { align: 'center' })
         if (pages > 1) doc.text(`Sivu ${i} / ${pages}`, 190, 284, { align: 'right' })
       }
 

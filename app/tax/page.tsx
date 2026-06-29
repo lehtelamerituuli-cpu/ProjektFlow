@@ -79,7 +79,7 @@ export default function Tax() {
 
   function downloadCSV() {
     const rows: string[][] = [
-      [`FreelanceHub verotusyhteenveto ${selectedYear}`],
+      [`ProjektFlow verotusyhteenveto ${selectedYear}`],
       [],
       ['TULOT'],
       ['Päivämäärä', 'Projekti', 'Kuvaus', 'Tunnit', '€/h', 'Summa (€)'],

@@ -18,13 +18,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "FreelanceHub",
+  title: "ProjektFlow",
   description: "Kevytyrittäjän työkalu – projektit, tuntiseuranta ja laskutus",
-  applicationName: "FreelanceHub",
+  applicationName: "ProjektFlow",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "FreelanceHub",
+    title: "ProjektFlow",
   },
   formatDetection: {
     telephone: false,

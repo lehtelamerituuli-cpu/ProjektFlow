@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'FreelanceHub',
-    short_name: 'FreelanceHub',
+    name: 'ProjektFlow',
+    short_name: 'ProjektFlow',
     description: 'Kevytyrittäjän työkalu – projektit, tuntiseuranta ja laskutus',
     start_url: '/dashboard',
     display: 'standalone',

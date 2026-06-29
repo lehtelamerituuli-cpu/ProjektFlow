@@ -228,7 +228,7 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
               <LogoMark />
             </div>
             <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', letterSpacing: '-0.3px' }}>
-              FreelanceHub
+              ProjektFlow
             </span>
           </div>
           {isMobile && (
