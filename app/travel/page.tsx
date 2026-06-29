@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/app/components/Sidebar'
 import { useIsMobile } from '@/app/hooks/useIsMobile'
+import { KM_RATE } from '@/lib/config'
 
 export default function Travel() {
   const router = useRouter()
@@ -52,7 +53,7 @@ export default function Travel() {
   }
 
   const totalKm = entries.reduce((s, e) => s + e.km, 0)
-  const totalComp = totalKm * 0.25
+  const totalComp = totalKm * KM_RATE
 
   const inp: React.CSSProperties = {
     width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
@@ -83,7 +84,7 @@ export default function Travel() {
           <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px'}}>
             <div style={{fontSize: 12, color: 'var(--muted)', fontWeight: 500, marginBottom: 14}}>Korvaus yhteensä</div>
             <div style={{fontSize: 30, fontWeight: 700, color: '#a78bfa'}}>{totalComp.toFixed(2)} €</div>
-            <div style={{fontSize: 12, color: 'var(--faint)', marginTop: 8}}>0,25 € / km</div>
+            <div style={{fontSize: 12, color: 'var(--faint)', marginTop: 8}}>{KM_RATE.toFixed(2).replace('.', ',')} € / km (Verohallinto {new Date().getFullYear()})</div>
           </div>
         </div>
 
@@ -143,7 +144,7 @@ export default function Travel() {
                     <td style={{padding: '13px 18px', fontWeight: 600, color: 'var(--text-soft)'}}>{e.projects?.name}</td>
                     <td className="mob-hide" style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.route}</td>
                     <td style={{padding: '13px 18px', color: 'var(--text-soft)'}}>{e.km} km</td>
-                    <td style={{padding: '13px 18px', color: '#a78bfa', fontWeight: 600}}>{(e.km * 0.25).toFixed(2)} €</td>
+                    <td style={{padding: '13px 18px', color: '#a78bfa', fontWeight: 600}}>{(e.km * KM_RATE).toFixed(2)} €</td>
                     <td style={{padding: '13px 18px'}}>
                       <button
                         onClick={() => deleteEntry(e.id)}

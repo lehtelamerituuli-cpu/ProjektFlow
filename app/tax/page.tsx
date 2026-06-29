@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/app/components/Sidebar'
 import { useIsMobile } from '@/app/hooks/useIsMobile'
+import { KM_RATE } from '@/lib/config'
 
 const currentYear = new Date().getFullYear()
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i)
@@ -69,7 +70,7 @@ export default function Tax() {
   }
 
   const totalIncome = sumBy(timeEntries, e => e.hours * e.rate)
-  const totalTravel = sumBy(travelEntries, e => e.km * 0.25)
+  const totalTravel = sumBy(travelEntries, e => e.km * KM_RATE)
   const totalExpenses = sumBy(expenseEntries, e => Number(e.amount))
   const totalReceipts = sumBy(receiptEntries, e => Number(e.amount))
   const taxableIncome = Math.max(0, totalIncome - totalExpenses - totalReceipts)
@@ -100,7 +101,7 @@ export default function Tax() {
         e.projects?.name || '',
         e.route || '',
         String(e.km),
-        (e.km * 0.25).toFixed(2),
+        (e.km * KM_RATE).toFixed(2),
       ]),
       ['', '', '', 'YHTEENSÄ', totalTravel.toFixed(2)],
       [],
