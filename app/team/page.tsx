@@ -1,13 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Sidebar from '../components/Sidebar'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { useRouter } from 'next/navigation'
+import { Sidebar } from '@/app/components/Sidebar'
+import { supabase } from '@/lib/supabase'
 
 type Member = { user_id: string; email: string; role: string; joined_at: string }
 type Invite = { id: string; email: string; created_at: string; expires_at: string }
@@ -15,6 +11,8 @@ type TimeEntry = { id: string; user_id: string; date: string; hours: number; rat
 type TravelEntry = { id: string; user_id: string; date: string; km: number; rate: number; description: string; projects: { name: string } | null }
 
 export default function TeamPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
   const [token, setToken] = useState<string | null>(null)
   const [team, setTeam] = useState<any>(null)
   const [membership, setMembership] = useState<any>(null)
@@ -31,10 +29,19 @@ export default function TeamPage() {
   const [activeTab, setActiveTab] = useState<'members' | 'entries'>('members')
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { router.push('/login'); return }
+      setUser(data.user)
+    })
     supabase.auth.getSession().then(({ data: { session } }) => {
       setToken(session?.access_token ?? null)
     })
   }, [])
+
+  async function logout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   const fetchTeam = useCallback(async (tok: string) => {
     const res = await fetch('/api/team', { headers: { Authorization: `Bearer ${tok}` } })
@@ -116,7 +123,7 @@ export default function TeamPage() {
 
   if (loading) return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
-      <Sidebar />
+      {user && <Sidebar user={user} onLogout={logout} />}
       <main style={{ flex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: 'var(--text-muted)' }}>Ladataan...</p>
       </main>
@@ -125,7 +132,7 @@ export default function TeamPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
-      <Sidebar />
+      {user && <Sidebar user={user} onLogout={logout} />}
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: 900, margin: '0 auto', width: '100%' }}>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text)', marginBottom: '1.5rem' }}>Tiimi</h1>
 
