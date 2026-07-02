@@ -83,7 +83,7 @@ export default function InvoicesPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: 'var(--text)' }}>Laskuhistoria</h1>
-            <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Kaikki lähetetyt ja maksetut laskut</p>
+            <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Seuraa laskujen tilaa ja maksuja.</p>
           </div>
           <button
             onClick={() => router.push('/laskutus')}

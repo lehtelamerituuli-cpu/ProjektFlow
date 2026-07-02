@@ -97,16 +97,16 @@ const LogoMark = () => (
 )
 
 const NAV = [
-  { href: '/dashboard',    label: 'Kojelauta',        Icon: IconGrid },
+  { href: '/dashboard',    label: 'Yleiskatsaus',      Icon: IconGrid },
   { href: '/projects',     label: 'Projektit',         Icon: IconFolder },
-  { href: '/time',         label: 'Työajan seuranta',  Icon: IconClock },
+  { href: '/time',         label: 'Tunnit',            Icon: IconClock },
   { href: '/travel',       label: 'Matkat',            Icon: IconMapPin },
   { href: '/expenses',     label: 'Kulut',             Icon: IconReceipt },
   { href: '/laskutus',     label: 'Laskutus',          Icon: IconFileText },
-  { href: '/invoices',     label: 'Laskuhistoria',      Icon: IconHistory },
+  { href: '/invoices',     label: 'Laskuhistoria',     Icon: IconHistory },
   { href: '/receipts',     label: 'Kuitit',            Icon: IconCamera },
   { href: '/tax',          label: 'Verotus',           Icon: IconPieChart },
-  { href: '/team',         label: 'Tiimi',              Icon: IconUsers },
+  { href: '/team',         label: 'Tiimi',             Icon: IconUsers },
 ]
 
 const DARK_VARS: Record<string, string> = {

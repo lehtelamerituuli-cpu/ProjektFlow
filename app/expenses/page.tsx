@@ -174,7 +174,7 @@ export default function Expenses() {
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: 'var(--text)' }}>Kulut</h1>
             <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>
-              {entries.length} kulukirjausta · {totalAmount.toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € yhteensä
+              {entries.length} kirjausta · {totalAmount.toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € yhteensä
             </p>
           </div>
           <button

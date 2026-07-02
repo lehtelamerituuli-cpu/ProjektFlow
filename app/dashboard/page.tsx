@@ -172,7 +172,7 @@ export default function Dashboard() {
               Hei, {user?.email?.split('@')[0]}!
             </h1>
             <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>
-              Tässä näkyvissä projektisi yleiskatsaus, aikataulut ja budjetit.
+              Kuukauden tulot, tunnit ja projektien tila yhdellä silmäyksellä.
             </p>
           </div>
 

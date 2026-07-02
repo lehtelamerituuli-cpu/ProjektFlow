@@ -136,7 +136,7 @@ export default function Time() {
           <div>
             <h1 style={{fontSize: 26, fontWeight: 700, margin: 0, color: 'var(--text)'}}>Työajan seuranta</h1>
             <p style={{color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5}}>
-              {totalHours.toFixed(1)} h kirjattu · {totalRevenue.toFixed(0)} € yhteensä
+              {totalHours.toFixed(1)} h · {totalRevenue.toFixed(0)} € kirjattu yhteensä
             </p>
           </div>
           <button

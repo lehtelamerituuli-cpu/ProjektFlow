@@ -201,7 +201,7 @@ export default function Tax() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: 'var(--text)' }}>Verotusyhteenveto</h1>
-            <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Arvio verotettavista tuloista ja vähennyksistä</p>
+            <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Tulot, vähennykset ja verotettava tulo valitulle vuodelle.</p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <select

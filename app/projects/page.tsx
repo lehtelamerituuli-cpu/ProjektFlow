@@ -246,7 +246,7 @@ export default function Projects() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: 'var(--text)', letterSpacing: '-0.5px' }}>Projektit</h1>
-            <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Tässä näkyvissä projektisi yleiskatsaus, aikataulut ja budjetit.</p>
+            <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Projektit, budjetit ja aikataulut yhdessä näkymässä.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 14px', fontSize: 13, color: 'var(--muted)', cursor: 'default' }}>
