@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/app/components/Sidebar'
+import { KM_RATE } from '@/lib/config'
+
+const SELLER_KEY = 'fh_seller_info'
 
 export default function Laskutus() {
   const router = useRouter()
@@ -16,10 +19,26 @@ export default function Laskutus() {
   const [generating, setGenerating] = useState(false)
   const [vatRate, setVatRate] = useState(0.255)
 
+  // Laskuttajan tiedot
+  const [sellerName, setSellerName] = useState('')
+  const [sellerAddress, setSellerAddress] = useState('')
+  const [sellerCity, setSellerCity] = useState('')
+  const [sellerYtunnus, setSellerYtunnus] = useState('')
+  const [sellerEmail, setSellerEmail] = useState('')
+  const [sellerPhone, setSellerPhone] = useState('')
+  const [sellerIban, setSellerIban] = useState('')
+
+  // Asiakkaan tiedot
+  const [buyerName, setBuyerName] = useState('')
+  const [buyerAddress, setBuyerAddress] = useState('')
+  const [buyerCity, setBuyerCity] = useState('')
+  const [buyerYtunnus, setBuyerYtunnus] = useState('')
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/login'); return }
       setUser(data.user)
+      setSellerEmail(data.user.email || '')
       loadData(data.user.id)
     })
     const now = new Date()
@@ -28,18 +47,49 @@ export default function Laskutus() {
     const dd = String(now.getDate()).padStart(2, '0')
     const ts = String(now.getTime()).slice(-3)
     setInvoiceNumber(`INV-${yy}${mm}${dd}-${ts}`)
+
+    try {
+      const saved = localStorage.getItem(SELLER_KEY)
+      if (saved) {
+        const s = JSON.parse(saved)
+        if (s.name) setSellerName(s.name)
+        if (s.address) setSellerAddress(s.address)
+        if (s.city) setSellerCity(s.city)
+        if (s.ytunnus) setSellerYtunnus(s.ytunnus)
+        if (s.phone) setSellerPhone(s.phone)
+        if (s.iban) setSellerIban(s.iban)
+      }
+    } catch {}
   }, [])
+
+  function saveSellerInfo() {
+    try {
+      localStorage.setItem(SELLER_KEY, JSON.stringify({
+        name: sellerName, address: sellerAddress, city: sellerCity,
+        ytunnus: sellerYtunnus, phone: sellerPhone, iban: sellerIban,
+      }))
+    } catch {}
+  }
 
   async function loadData(uid: string) {
     const [{ data: p }, { data: t }, { data: tr }] = await Promise.all([
-      supabase.from('projects').select('*').eq('user_id', uid).order('name'),
+      supabase.from('projects').select('*').order('name'),
       supabase.from('time_entries').select('*, projects(name,client)').eq('user_id', uid).order('date'),
       supabase.from('travel_entries').select('*, projects(name,client)').eq('user_id', uid).order('date'),
     ])
     setProjects(p || [])
     setTimeEntries(t || [])
     setTravelEntries(tr || [])
+    if (p && p.length > 0) {
+      const first = p[0]
+      if (first.client) setBuyerName(first.client)
+    }
   }
+
+  useEffect(() => {
+    const proj = projects.find(p => p.id === selectedProjectId)
+    if (proj?.client) setBuyerName(proj.client)
+  }, [selectedProjectId, projects])
 
   async function logout() {
     await supabase.auth.signOut()
@@ -53,10 +103,13 @@ export default function Laskutus() {
   const totalHours = filteredTime.reduce((s, e) => s + e.hours, 0)
   const totalIncome = filteredTime.reduce((s, e) => s + e.hours * e.rate, 0)
   const totalKm = filteredTravel.reduce((s, e) => s + e.km, 0)
-  const totalTravel = totalKm * 0.25
+  const totalTravel = totalKm * KM_RATE
   const grandTotal = totalIncome + totalTravel
+  const vatAmount = grandTotal * vatRate
+  const grossTotal = grandTotal + vatAmount
 
   async function downloadPDF() {
+    saveSellerInfo()
     setGenerating(true)
     try {
       const { jsPDF } = await import('jspdf')
@@ -68,8 +121,8 @@ export default function Laskutus() {
       due.setDate(due.getDate() + 14)
       const dueDateStr = due.toLocaleDateString('fi-FI')
       const projectName = selectedProject ? selectedProject.name : 'Kaikki projektit'
-      const clientName = selectedProject?.client || ''
 
+      // Header
       doc.setFillColor(124, 58, 237)
       doc.rect(0, 0, 210, 38, 'F')
       doc.setFont('helvetica', 'bold')
@@ -78,42 +131,55 @@ export default function Laskutus() {
       doc.text('LASKU', 20, 24)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(invoiceNumber, 190, 16, { align: 'right' })
-      doc.text(dateStr, 190, 25, { align: 'right' })
+      doc.text(invoiceNumber, 190, 14, { align: 'right' })
+      doc.text('Päivämäärä: ' + dateStr, 190, 22, { align: 'right' })
+      doc.text('Eräpäivä: ' + dueDateStr, 190, 30, { align: 'right' })
 
+      // Laskuttaja & Asiakas
+      let y = 48
       doc.setTextColor(40, 40, 70)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(8)
-      doc.text('LASKUTTAJA', 20, 52)
+      doc.text('LASKUTTAJA', 20, y)
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(11)
+      doc.setFontSize(10)
       doc.setTextColor(20, 20, 50)
-      doc.text(user?.email || '', 20, 60)
+      y += 6
+      if (sellerName) { doc.text(sellerName, 20, y); y += 5 }
+      if (sellerAddress) { doc.text(sellerAddress, 20, y); y += 5 }
+      if (sellerCity) { doc.text(sellerCity, 20, y); y += 5 }
+      if (sellerYtunnus) { doc.text('Y-tunnus: ' + sellerYtunnus, 20, y); y += 5 }
+      if (sellerEmail) { doc.text(sellerEmail, 20, y); y += 5 }
+      if (sellerPhone) { doc.text(sellerPhone, 20, y); y += 5 }
 
-      if (clientName) {
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(8)
-        doc.setTextColor(40, 40, 70)
-        doc.text('ASIAKAS', 110, 52)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(11)
-        doc.setTextColor(20, 20, 50)
-        doc.text(clientName, 110, 60)
-      }
+      let y2 = 54
+      doc.setTextColor(40, 40, 70)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text('ASIAKAS', 110, 48)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(20, 20, 50)
+      if (buyerName) { doc.text(buyerName, 110, y2); y2 += 5 }
+      if (buyerAddress) { doc.text(buyerAddress, 110, y2); y2 += 5 }
+      if (buyerCity) { doc.text(buyerCity, 110, y2); y2 += 5 }
+      if (buyerYtunnus) { doc.text('Y-tunnus: ' + buyerYtunnus, 110, y2); y2 += 5 }
 
+      y = Math.max(y, y2) + 6
+
+      // Projekti-banneri
       doc.setFillColor(237, 233, 254)
-      doc.rect(20, 67, 170, 12, 'F')
+      doc.rect(20, y, 170, 10, 'F')
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
       doc.setTextColor(79, 46, 180)
-      doc.text('Projekti: ' + projectName, 25, 75)
+      doc.text('Projekti: ' + projectName, 25, y + 7)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(100, 80, 170)
-      doc.text('Erapaiva: ' + dueDateStr, 188, 75, { align: 'right' })
+      doc.text('Maksuehto: 14 päivää netto', 188, y + 7, { align: 'right' })
+      y += 16
 
-      let y = 87
-
-      const checkPage = () => { if (y > 255) { doc.addPage(); y = 20 } }
+      const checkPage = () => { if (y > 250) { doc.addPage(); y = 20 } }
 
       const drawHeader = (cols: { label: string, x: number, align?: 'right' }[]) => {
         doc.setFillColor(50, 30, 100)
@@ -128,6 +194,7 @@ export default function Laskutus() {
         y += 8
       }
 
+      // Aikakirjaukset
       if (filteredTime.length > 0) {
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(11)
@@ -158,6 +225,7 @@ export default function Laskutus() {
         y += 12
       }
 
+      // Matkakirjaukset
       if (filteredTravel.length > 0) {
         checkPage()
         doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 50)
@@ -173,9 +241,9 @@ export default function Laskutus() {
           doc.text(e.date, 23, y + 5)
           doc.text((e.route || '').replace(/→/g, '->'), 48, y + 5, { maxWidth: 95 })
           doc.text(String(e.km), 148, y + 5, { align: 'right' })
-          doc.text('0.25', 166, y + 5, { align: 'right' })
+          doc.text(KM_RATE.toFixed(2), 166, y + 5, { align: 'right' })
           doc.setFont('helvetica', 'bold')
-          doc.text((e.km * 0.25).toFixed(2) + ' EUR', 188, y + 5, { align: 'right' })
+          doc.text((e.km * KM_RATE).toFixed(2) + ' EUR', 188, y + 5, { align: 'right' })
           y += 7
         })
         doc.setDrawColor(180, 160, 230); doc.line(20, y, 190, y); y += 5
@@ -185,17 +253,37 @@ export default function Laskutus() {
         y += 14
       }
 
+      // ALV-erittely & loppusumma
       checkPage()
+      doc.setDrawColor(200, 185, 240); doc.line(110, y, 190, y); y += 4
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 120)
+      doc.text('Veroton hinta (netto):', 115, y)
+      doc.text(grandTotal.toFixed(2) + ' EUR', 188, y, { align: 'right' })
+      y += 6
+
+      const vatLabel = vatRate === 0 ? 'ALV 0 % (veroton)' : `ALV ${(vatRate * 100).toFixed(1).replace('.', ',')} %`
+      doc.text(vatLabel + ':', 115, y)
+      doc.text(vatAmount.toFixed(2) + ' EUR', 188, y, { align: 'right' })
+      y += 8
+
       doc.setFillColor(124, 58, 237)
       doc.rect(110, y, 80, 14, 'F')
       doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
       doc.text('YHTEENSA:', 115, y + 9.5)
-      doc.text(grandTotal.toFixed(2) + ' EUR', 187, y + 9.5, { align: 'right' })
-      y += 22
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 140)
-      doc.text('Maksuehto: 14 paivaa netto', 20, y)
-      doc.text('Erapaiva: ' + dueDateStr, 20, y + 6)
+      doc.text(grossTotal.toFixed(2) + ' EUR', 187, y + 9.5, { align: 'right' })
+      y += 20
 
+      // Maksutiedot
+      if (sellerIban) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(40, 40, 70)
+        doc.text('TILINUMERO', 20, y)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(20, 20, 50)
+        doc.text(sellerIban, 20, y + 6)
+        y += 14
+      }
+
+      // Alatunniste
       const pages = doc.getNumberOfPages()
       for (let i = 1; i <= pages; i++) {
         doc.setPage(i)
@@ -216,11 +304,14 @@ export default function Laskutus() {
     borderRadius: 8, padding: '9px 13px', color: 'var(--text-soft)',
     fontSize: 13, fontFamily: 'system-ui', boxSizing: 'border-box',
   }
+  const label: React.CSSProperties = {
+    fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500,
+  }
 
   return (
     <div style={{display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'system-ui,sans-serif'}}>
       {user && <Sidebar user={user} onLogout={logout} />}
-      <main style={{flex: 1, padding: '32px 36px', overflow: 'auto'}}>
+      <main style={{flex: 1, padding: '32px 36px', overflow: 'auto', maxWidth: 960}}>
 
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28}}>
           <div>
@@ -249,11 +340,37 @@ export default function Laskutus() {
           </button>
         </div>
 
-        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px', marginBottom: 20}}>
-          <div style={{fontSize: 12, color: 'var(--muted-strong)', fontWeight: 500, marginBottom: 16}}>LASKUN ASETUKSET</div>
+        {/* Laskuttajan tiedot */}
+        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px', marginBottom: 16}}>
+          <div style={{fontSize: 12, color: 'var(--muted-strong)', fontWeight: 600, marginBottom: 16}}>LASKUTTAJAN TIEDOT <span style={{fontWeight: 400, color: 'var(--faint)'}}>(tallennetaan automaattisesti)</span></div>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14}}>
+            <div><label style={label}>Koko nimi *</label><input value={sellerName} onChange={e => setSellerName(e.target.value)} style={inp} placeholder="Etunimi Sukunimi" /></div>
+            <div><label style={label}>Katuosoite *</label><input value={sellerAddress} onChange={e => setSellerAddress(e.target.value)} style={inp} placeholder="Esimerkkikatu 1" /></div>
+            <div><label style={label}>Postinumero ja kaupunki *</label><input value={sellerCity} onChange={e => setSellerCity(e.target.value)} style={inp} placeholder="00100 Helsinki" /></div>
+            <div><label style={label}>Y-tunnus *</label><input value={sellerYtunnus} onChange={e => setSellerYtunnus(e.target.value)} style={inp} placeholder="1234567-8" /></div>
+            <div><label style={label}>Sähköposti</label><input value={sellerEmail} onChange={e => setSellerEmail(e.target.value)} style={inp} placeholder="nimi@esimerkki.fi" /></div>
+            <div><label style={label}>Puhelin</label><input value={sellerPhone} onChange={e => setSellerPhone(e.target.value)} style={inp} placeholder="+358 40 1234567" /></div>
+            <div style={{gridColumn: '1 / -1'}}><label style={label}>IBAN-tilinumero</label><input value={sellerIban} onChange={e => setSellerIban(e.target.value)} style={inp} placeholder="FI12 3456 7890 1234 56" /></div>
+          </div>
+        </div>
+
+        {/* Asiakkaan tiedot */}
+        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px', marginBottom: 16}}>
+          <div style={{fontSize: 12, color: 'var(--muted-strong)', fontWeight: 600, marginBottom: 16}}>ASIAKKAAN TIEDOT</div>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14}}>
+            <div><label style={label}>Yritys tai nimi *</label><input value={buyerName} onChange={e => setBuyerName(e.target.value)} style={inp} placeholder="Asiakasyritys Oy" /></div>
+            <div><label style={label}>Katuosoite</label><input value={buyerAddress} onChange={e => setBuyerAddress(e.target.value)} style={inp} placeholder="Asiakaskatu 2" /></div>
+            <div><label style={label}>Postinumero ja kaupunki</label><input value={buyerCity} onChange={e => setBuyerCity(e.target.value)} style={inp} placeholder="00100 Helsinki" /></div>
+            <div><label style={label}>Y-tunnus</label><input value={buyerYtunnus} onChange={e => setBuyerYtunnus(e.target.value)} style={inp} placeholder="9876543-2" /></div>
+          </div>
+        </div>
+
+        {/* Laskun asetukset */}
+        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px', marginBottom: 16}}>
+          <div style={{fontSize: 12, color: 'var(--muted-strong)', fontWeight: 600, marginBottom: 16}}>LASKUN ASETUKSET</div>
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14}}>
             <div>
-              <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Projekti</label>
+              <label style={label}>Projekti</label>
               <select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} style={inp}>
                 <option value="all">Kaikki projektit</option>
                 {projects.map(p => (
@@ -262,23 +379,19 @@ export default function Laskutus() {
               </select>
             </div>
             <div>
-              <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Laskunumero</label>
+              <label style={label}>Laskunumero</label>
               <input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} style={inp} />
             </div>
           </div>
-          {selectedProject?.client && (
-            <div style={{marginTop: 12, fontSize: 13, color: 'var(--muted)'}}>
-              Asiakas: <span style={{color: '#a78bfa', fontWeight: 600}}>{selectedProject.client}</span>
-            </div>
-          )}
         </div>
 
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20}}>
+        {/* Yhteenveto-kortit */}
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 16}}>
           {[
             { label: 'Tunnit yhteensä', value: `${totalHours.toFixed(1)} h`, sub: `${filteredTime.length} kirjausta`, color: '#60a5fa' },
             { label: 'Tuntityöt', value: `${totalIncome.toFixed(2)} €`, sub: 'tunnit × tuntihinta', color: '#a78bfa' },
-            { label: 'Matkakorvaukset', value: `${totalTravel.toFixed(2)} €`, sub: `${totalKm} km × 0,25 €`, color: '#a78bfa' },
-            { label: 'Yhteensä', value: `${grandTotal.toFixed(2)} €`, sub: 'laskutettava summa', color: '#fff', highlight: true },
+            { label: 'Matkakorvaukset', value: `${totalTravel.toFixed(2)} €`, sub: `${totalKm} km × ${KM_RATE.toFixed(2).replace('.', ',')} €`, color: '#a78bfa' },
+            { label: 'Netto yhteensä', value: `${grandTotal.toFixed(2)} €`, sub: 'ilman ALV:tä', color: '#fff', highlight: true },
           ].map(c => (
             <div key={c.label} style={{
               background: c.highlight ? 'rgba(124,58,237,0.13)' : 'var(--surface)',
@@ -292,7 +405,8 @@ export default function Laskutus() {
           ))}
         </div>
 
-        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 24px', marginBottom: 20}}>
+        {/* ALV-laskelma */}
+        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 24px', marginBottom: 16}}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10}}>
             <div style={{fontSize: 14, fontWeight: 600, color: 'var(--text-heading)'}}>ALV-laskelma</div>
             <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
@@ -313,11 +427,11 @@ export default function Laskutus() {
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14}}>
             {[
               { label: 'Netto (ilman ALV)', value: grandTotal, sub: 'laskutettava summa', color: '#60a5fa' },
-              { label: `ALV ${(vatRate * 100).toFixed(1).replace('.',',')} %`, value: grandTotal * vatRate, sub: 'arvonlisävero', color: '#fbbf24' },
-              { label: 'Brutto (ALV:n kanssa)', value: grandTotal * (1 + vatRate), sub: 'asiakkaan maksaa', color: '#a78bfa', highlight: true },
+              { label: `ALV ${(vatRate * 100).toFixed(1).replace('.',',')} %`, value: vatAmount, sub: 'arvonlisävero', color: '#fbbf24' },
+              { label: 'Brutto (ALV:n kanssa)', value: grossTotal, sub: 'asiakkaan maksaa', color: '#a78bfa', highlight: true },
             ].map(c => (
-              <div key={c.label} style={{background: c.highlight ? 'rgba(124,58,237,0.1)' : 'var(--bg)', border: `1px solid ${c.highlight ? 'rgba(124,58,237,0.25)' : 'var(--border)'}`, borderRadius: 10, padding: '16px 18px'}}>
-                <div style={{fontSize: 11.5, color: c.highlight ? '#a78bfa' : 'var(--muted)', fontWeight: 500, marginBottom: 10}}>{c.label}</div>
+              <div key={c.label} style={{background: (c as any).highlight ? 'rgba(124,58,237,0.1)' : 'var(--bg)', border: `1px solid ${(c as any).highlight ? 'rgba(124,58,237,0.25)' : 'var(--border)'}`, borderRadius: 10, padding: '16px 18px'}}>
+                <div style={{fontSize: 11.5, color: (c as any).highlight ? '#a78bfa' : 'var(--muted)', fontWeight: 500, marginBottom: 10}}>{c.label}</div>
                 <div style={{fontSize: 22, fontWeight: 700, color: c.color, lineHeight: 1, marginBottom: 6}}>{c.value.toFixed(2)} €</div>
                 <div style={{fontSize: 11.5, color: 'var(--faint)'}}>{c.sub}</div>
               </div>
@@ -325,6 +439,7 @@ export default function Laskutus() {
           </div>
         </div>
 
+        {/* Aikakirjaukset */}
         <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 14}}>
           <div style={{padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <h2 style={{fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text-heading)'}}>Aikakirjaukset</h2>
@@ -357,6 +472,7 @@ export default function Laskutus() {
           )}
         </div>
 
+        {/* Matkakirjaukset */}
         <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden'}}>
           <div style={{padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <h2 style={{fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text-heading)'}}>Matkakirjaukset</h2>
@@ -380,7 +496,7 @@ export default function Laskutus() {
                     <td style={{padding: '13px 18px', fontWeight: 600, color: 'var(--text-soft)'}}>{e.projects?.name}</td>
                     <td style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.route}</td>
                     <td style={{padding: '13px 18px', color: 'var(--text-soft)'}}>{e.km} km</td>
-                    <td style={{padding: '13px 18px', color: '#a78bfa', fontWeight: 600}}>{(e.km * 0.25).toFixed(2)} €</td>
+                    <td style={{padding: '13px 18px', color: '#a78bfa', fontWeight: 600}}>{(e.km * KM_RATE).toFixed(2)} €</td>
                   </tr>
                 ))}
               </tbody>
