@@ -153,7 +153,7 @@ export default function InvoicesPage() {
                         <td style={{ padding: '12px 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
                           <button
                             onClick={() => { setEditingId(editingId === inv.id ? null : inv.id); setEditNotes(inv.notes || '') }}
-                            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 12, padding: '3px 8px', borderRadius: 6, background: 'var(--bg)' } as any}
+                            style={{ background: 'var(--bg)', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 12, padding: '3px 8px', borderRadius: 6 }}
                           >
                             Muistiinpano
                           </button>
