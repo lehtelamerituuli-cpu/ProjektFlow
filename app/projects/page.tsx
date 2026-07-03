@@ -122,6 +122,7 @@ export default function Projects() {
   const [editBudget, setEditBudget] = useState('')
   const [localNotes, setLocalNotes] = useState<Record<string, string>>({})
   const [isOwner, setIsOwner] = useState(true)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -212,24 +213,30 @@ export default function Projects() {
     return { ...p, revenue, expenses, progress, kate, color: COLORS[i % COLORS.length] }
   })
 
-  const activeCount = projects.filter(p => p.status === 'active').length
-  const doneCount = projects.filter(p => p.status === 'valmis').length
-  const totalBudget = projects.reduce((s, p) => s + (p.budget || 0), 0)
-  const totalRevenue = pw.reduce((s, p) => s + p.revenue + p.expenses, 0)
-  const kateVals = pw.filter(p => p.kate !== null).map(p => p.kate as number)
+  const now = new Date()
+
+  const viewPw = selectedProjectId ? pw.filter(p => p.id === selectedProjectId) : pw
+  const viewProjects = selectedProjectId ? projects.filter(p => p.id === selectedProjectId) : projects
+
+  const activeCount = viewProjects.filter(p => p.status === 'active').length
+  const doneCount = viewProjects.filter(p => p.status === 'valmis').length
+  const totalBudget = viewProjects.reduce((s, p) => s + (p.budget || 0), 0)
+  const totalRevenue = viewPw.reduce((s, p) => s + p.revenue + p.expenses, 0)
+  const kateVals = viewPw.filter(p => p.kate !== null).map(p => p.kate as number)
   const avgKate = kateVals.length > 0 ? kateVals.reduce((s, v) => s + v, 0) / kateVals.length : null
   const budgetPct = totalBudget > 0 ? totalRevenue / totalBudget * 100 : 0
 
-  const now = new Date()
-  const upcoming = projects
+  const upcoming = viewProjects
     .filter(p => p.deadline && p.status === 'active')
     .map(p => ({ ...p, daysLeft: Math.ceil((new Date(p.deadline).getTime() - now.getTime()) / 86400000) }))
     .filter(p => p.daysLeft >= 0).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5)
 
   const statusSegments = [
-    { label: 'Aktiivinen',  color: '#7c3aed', count: activeCount },
-    { label: 'Valmis',      color: '#10b981', count: doneCount },
+    { label: 'Aktiivinen', color: '#7c3aed', count: activeCount },
+    { label: 'Valmis',     color: '#10b981', count: doneCount },
   ]
+
+  const selectedPw = selectedProjectId ? pw.find(p => p.id === selectedProjectId) : null
 
   const inp: React.CSSProperties = {
     width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
@@ -265,6 +272,80 @@ export default function Projects() {
             </div>
           </div>
         </div>
+
+        {/* Project selector pills */}
+        {projects.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            <button
+              onClick={() => setSelectedProjectId(null)}
+              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid var(--border)', background: selectedProjectId === null ? '#7c3aed' : 'var(--surface)', color: selectedProjectId === null ? '#fff' : 'var(--muted)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}
+            >
+              Kaikki projektit
+            </button>
+            {pw.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProjectId(p.id)}
+                style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${selectedProjectId === p.id ? p.color : 'var(--border)'}`, background: selectedProjectId === p.id ? `${p.color}22` : 'var(--surface)', color: selectedProjectId === p.id ? p.color : 'var(--muted)', fontSize: 12.5, fontWeight: selectedProjectId === p.id ? 600 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color }} />
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Single project detail panel */}
+        {selectedPw && (
+          <div style={{ background: 'var(--surface)', border: `1px solid ${selectedPw.color}40`, borderRadius: 16, padding: '22px 24px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedPw.color }} />
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{selectedPw.name}</span>
+                  <span style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: selectedPw.status === 'active' ? 'rgba(251,146,60,0.15)' : 'rgba(16,185,129,0.12)', color: selectedPw.status === 'active' ? '#fb923c' : '#34d399' }}>
+                    {selectedPw.status === 'active' ? 'Käynnissä' : 'Valmis'}
+                  </span>
+                </div>
+                {selectedPw.client && <div style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 20 }}>{selectedPw.client}</div>}
+              </div>
+              {selectedPw.deadline && (() => {
+                const days = Math.ceil((new Date(selectedPw.deadline).getTime() - now.getTime()) / 86400000)
+                return (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Deadline</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: days <= 7 ? '#f87171' : days <= 30 ? '#fb923c' : 'var(--text-soft)' }}>{selectedPw.deadline}</div>
+                    <div style={{ fontSize: 11.5, color: days <= 7 ? '#f87171' : 'var(--muted)' }}>{days >= 0 ? `${days} pv jäljellä` : 'Mennyt'}</div>
+                  </div>
+                )
+              })()}
+            </div>
+            {selectedPw.budget > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+                  <span>Budjetin käyttö</span>
+                  <span>{Math.round(selectedPw.progress)} % · {Math.round(selectedPw.revenue + selectedPw.expenses).toLocaleString('fi-FI')} € / {selectedPw.budget.toLocaleString('fi-FI')} €</span>
+                </div>
+                <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 4, background: selectedPw.progress >= 100 ? '#f87171' : selectedPw.progress >= 80 ? '#fb923c' : selectedPw.color, width: `${Math.min(selectedPw.progress, 100)}%`, transition: 'width .4s' }} />
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+              {[
+                { label: 'Laskutettu', value: `${Math.round(selectedPw.revenue).toLocaleString('fi-FI')} €`, color: '#60a5fa' },
+                { label: 'Kulut', value: `${Math.round(selectedPw.expenses).toLocaleString('fi-FI')} €`, color: '#f87171' },
+                { label: 'Yhteensä', value: `${Math.round(selectedPw.revenue + selectedPw.expenses).toLocaleString('fi-FI')} €`, color: selectedPw.color },
+                { label: 'Kate', value: selectedPw.kate !== null ? `${Math.round(selectedPw.kate)} %` : '—', color: (selectedPw.kate ?? 0) > 0 ? '#34d399' : '#f87171' },
+              ].map(s => (
+                <div key={s.label} style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: s.color }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stat cards */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
@@ -318,12 +399,6 @@ export default function Projects() {
                 ))}
               </div>
             </div>
-            <div style={{ marginTop: 16 }}>
-              <button style={{ fontSize: 12.5, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}
-                onClick={() => setShowForm(true)}>
-                Näytä kaikki projektit →
-              </button>
-            </div>
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
@@ -353,13 +428,6 @@ export default function Projects() {
                 })}
               </div>
             )}
-            {upcoming.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <button style={{ fontSize: 12.5, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>
-                  Näytä koko aikataulu →
-                </button>
-              </div>
-            )}
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
@@ -368,13 +436,6 @@ export default function Projects() {
               <div style={{ color: 'var(--faint)', fontSize: 13, marginTop: 14 }}>Ei projekteja.</div>
             ) : (
               <BarChart items={pw.map(p => ({ label: p.name, budget: p.budget || 0, revenue: p.revenue }))} />
-            )}
-            {pw.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <button style={{ fontSize: 12.5, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>
-                  Näytä budjettiraportti →
-                </button>
-              </div>
             )}
           </div>
         </div>
@@ -406,7 +467,7 @@ export default function Projects() {
               </button>
             )}
           </div>
-          {projects.length === 0 ? (
+          {viewPw.length === 0 ? (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--faint)', fontSize: 14 }}>Ei projekteja vielä. Lisää ensimmäinen projekti!</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -426,7 +487,7 @@ export default function Projects() {
                 </tr>
               </thead>
               <tbody>
-                {pw.map(p => (
+                {viewPw.map(p => (
                   <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                     <td style={{ padding: '14px 18px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
