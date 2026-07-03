@@ -339,9 +339,9 @@ export default function Time() {
                         return (
                           <div
                             key={e.id}
-                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: i < dayEntries.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: i < dayEntries.length - 1 ? '1px solid var(--border-subtle)' : 'none', position: 'relative' }}
                           >
-                            <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 4, background: color, flexShrink: 0 }} />
+                            <div style={{ width: 3, height: 36, borderRadius: 4, background: color, flexShrink: 0 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-soft)', marginBottom: 2 }}>
                                 {e.projects?.name || '—'}
