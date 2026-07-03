@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/app/components/Sidebar'
 import { useIsMobile } from '@/app/hooks/useIsMobile'
+import { BREAK_THRESHOLD_HOURS, BREAK_DEDUCTION_HOURS } from '@/lib/config'
 
 export default function Time() {
   const router = useRouter()
@@ -72,7 +73,13 @@ export default function Time() {
 
   async function addEntry() {
     if (!projectId || !hours || !user) return
-    await supabase.from('time_entries').insert({ project_id: projectId, date, hours: parseFloat(hours), rate: parseFloat(rate) || 0, description, user_id: user.id })
+    const rawH = parseFloat(hours)
+    const breakDeducted = rawH >= BREAK_THRESHOLD_HOURS
+    const finalH = breakDeducted ? parseFloat((rawH - BREAK_DEDUCTION_HOURS).toFixed(2)) : rawH
+    const finalDesc = breakDeducted && !description
+      ? `−${BREAK_DEDUCTION_HOURS * 60} min tauko vähennetty`
+      : description
+    await supabase.from('time_entries').insert({ project_id: projectId, date, hours: finalH, rate: parseFloat(rate) || 0, description: finalDesc, user_id: user.id })
     setHours(''); setDescription(''); setShowForm(false)
     loadEntries(user.id)
   }
@@ -89,9 +96,14 @@ export default function Time() {
     setTimerRunning(false)
     setTimerStart(null)
     localStorage.removeItem(TIMER_KEY)
-    const h = parseFloat((timerSeconds / 3600).toFixed(2))
+    let h = parseFloat((timerSeconds / 3600).toFixed(2))
     if (h > 0 && projectId && user) {
-      await supabase.from('time_entries').insert({ project_id: projectId, date: new Date().toISOString().split('T')[0], hours: h, rate: parseFloat(rate) || 0, description: 'Ajastettu työ', user_id: user.id })
+      const breakDeducted = h >= BREAK_THRESHOLD_HOURS
+      if (breakDeducted) h = parseFloat((h - BREAK_DEDUCTION_HOURS).toFixed(2))
+      const desc = breakDeducted
+        ? `Ajastettu työ (−${BREAK_DEDUCTION_HOURS * 60} min tauko vähennetty)`
+        : 'Ajastettu työ'
+      await supabase.from('time_entries').insert({ project_id: projectId, date: new Date().toISOString().split('T')[0], hours: h, rate: parseFloat(rate) || 0, description: desc, user_id: user.id })
       loadEntries(user.id)
     }
     setTimerSeconds(0)
@@ -196,6 +208,11 @@ export default function Time() {
               <div>
                 <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Tunnit</label>
                 <input value={hours} onChange={e => setHours(e.target.value)} type="number" step="0.5" style={inp} placeholder="0.0" />
+                {parseFloat(hours) >= BREAK_THRESHOLD_HOURS && (
+                  <div style={{ marginTop: 5, fontSize: 11.5, color: '#fb923c' }}>
+                    ⚠ Yli {BREAK_THRESHOLD_HOURS} h — {BREAK_DEDUCTION_HOURS * 60} min tauko vähennetään automaattisesti → {(parseFloat(hours) - BREAK_DEDUCTION_HOURS).toFixed(2)} h kirjataan
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Tuntihinta (€/h)</label>
