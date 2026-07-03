@@ -22,6 +22,8 @@ export default function Time() {
   const [timerStart, setTimerStart] = useState<number | null>(null)
   const [timerSeconds, setTimerSeconds] = useState(0)
   const [projectRates, setProjectRates] = useState<Record<string, number>>({})
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
   const [filterProject, setFilterProject] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
@@ -71,16 +73,30 @@ export default function Time() {
     if (projectId && rates[projectId]) setRate(String(rates[projectId]))
   }
 
+  function timeToHours(t: string) {
+    const [h, m] = t.split(':').map(Number)
+    return h + m / 60
+  }
+
   async function addEntry() {
-    if (!projectId || !hours || !user) return
-    const rawH = parseFloat(hours)
+    if (!projectId || !user) return
+    let rawH: number
+    let st = startTime || undefined
+    let et = endTime || undefined
+    if (startTime && endTime) {
+      rawH = parseFloat((timeToHours(endTime) - timeToHours(startTime)).toFixed(2))
+      if (rawH <= 0) return
+    } else {
+      if (!hours) return
+      rawH = parseFloat(hours)
+    }
     const breakDeducted = rawH >= BREAK_THRESHOLD_HOURS
     const finalH = breakDeducted ? parseFloat((rawH - BREAK_DEDUCTION_HOURS).toFixed(2)) : rawH
     const finalDesc = breakDeducted && !description
       ? `−${BREAK_DEDUCTION_HOURS * 60} min tauko vähennetty`
       : description
-    await supabase.from('time_entries').insert({ project_id: projectId, date, hours: finalH, rate: parseFloat(rate) || 0, description: finalDesc, user_id: user.id })
-    setHours(''); setDescription(''); setShowForm(false)
+    await supabase.from('time_entries').insert({ project_id: projectId, date, hours: finalH, rate: parseFloat(rate) || 0, description: finalDesc, user_id: user.id, start_time: st || null, end_time: et || null })
+    setHours(''); setDescription(''); setStartTime(''); setEndTime(''); setShowForm(false)
     loadEntries(user.id)
   }
 
@@ -93,6 +109,7 @@ export default function Time() {
   }
 
   async function stopTimer() {
+    const stopTs = Date.now()
     setTimerRunning(false)
     setTimerStart(null)
     localStorage.removeItem(TIMER_KEY)
@@ -103,7 +120,10 @@ export default function Time() {
       const desc = breakDeducted
         ? `Ajastettu työ (−${BREAK_DEDUCTION_HOURS * 60} min tauko vähennetty)`
         : 'Ajastettu työ'
-      await supabase.from('time_entries').insert({ project_id: projectId, date: new Date().toISOString().split('T')[0], hours: h, rate: parseFloat(rate) || 0, description: desc, user_id: user.id })
+      const fmt2 = (ts: number) => new Date(ts).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })
+      const st = timerStart ? fmt2(timerStart) : null
+      const et = fmt2(stopTs)
+      await supabase.from('time_entries').insert({ project_id: projectId, date: new Date().toISOString().split('T')[0], hours: h, rate: parseFloat(rate) || 0, description: desc, user_id: user.id, start_time: st, end_time: et })
       loadEntries(user.id)
     }
     setTimerSeconds(0)
@@ -121,6 +141,24 @@ export default function Time() {
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+
+  const ENTRY_COLORS = ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#8b5cf6']
+  function projectColor(id: string) {
+    let h = 0
+    for (const c of (id || '')) h = (h * 31 + c.charCodeAt(0)) & 0xffff
+    return ENTRY_COLORS[h % ENTRY_COLORS.length]
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0]
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  function dateLabel(d: string) {
+    const date = new Date(d + 'T12:00:00')
+    const wd = date.toLocaleDateString('fi-FI', { weekday: 'long' })
+    const dm = date.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' })
+    if (d === todayStr) return `Tänään, ${wd} ${dm}`
+    if (d === yesterdayStr) return `Eilen, ${wd} ${dm}`
+    return `${wd.charAt(0).toUpperCase() + wd.slice(1)} ${dm}`
+  }
 
   const inp: React.CSSProperties = {
     width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
@@ -206,14 +244,32 @@ export default function Time() {
                 <input value={date} onChange={e => setDate(e.target.value)} type="date" style={inp} />
               </div>
               <div>
-                <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Tunnit</label>
-                <input value={hours} onChange={e => setHours(e.target.value)} type="number" step="0.5" style={inp} placeholder="0.0" />
-                {parseFloat(hours) >= BREAK_THRESHOLD_HOURS && (
-                  <div style={{ marginTop: 5, fontSize: 11.5, color: '#fb923c' }}>
-                    ⚠ Yli {BREAK_THRESHOLD_HOURS} h — {BREAK_DEDUCTION_HOURS * 60} min tauko vähennetään automaattisesti → {(parseFloat(hours) - BREAK_DEDUCTION_HOURS).toFixed(2)} h kirjataan
+                <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Aloitusaika</label>
+                <input value={startTime} onChange={e => setStartTime(e.target.value)} type="time" style={inp} />
+              </div>
+              <div>
+                <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Lopetusaika</label>
+                <input value={endTime} onChange={e => setEndTime(e.target.value)} type="time" style={inp} />
+                {startTime && endTime && timeToHours(endTime) > timeToHours(startTime) && (
+                  <div style={{ marginTop: 5, fontSize: 11.5, color: 'var(--muted)' }}>
+                    Kesto: {(timeToHours(endTime) - timeToHours(startTime)).toFixed(2)} h
+                    {(timeToHours(endTime) - timeToHours(startTime)) >= BREAK_THRESHOLD_HOURS && (
+                      <span style={{ color: '#fb923c' }}> → {(timeToHours(endTime) - timeToHours(startTime) - BREAK_DEDUCTION_HOURS).toFixed(2)} h (tauko vähennetty)</span>
+                    )}
                   </div>
                 )}
               </div>
+              {!(startTime && endTime) && (
+              <div>
+                <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Tunnit (jos ei aikoja)</label>
+                <input value={hours} onChange={e => setHours(e.target.value)} type="number" step="0.5" style={inp} placeholder="0.0" />
+                {parseFloat(hours) >= BREAK_THRESHOLD_HOURS && (
+                  <div style={{ marginTop: 5, fontSize: 11.5, color: '#fb923c' }}>
+                    ⚠ Yli {BREAK_THRESHOLD_HOURS} h — {BREAK_DEDUCTION_HOURS * 60} min tauko vähennetään → {(parseFloat(hours) - BREAK_DEDUCTION_HOURS).toFixed(2)} h kirjataan
+                  </div>
+                )}
+              </div>
+              )}
               <div>
                 <label style={{fontSize: 11.5, color: 'var(--muted-strong)', display: 'block', marginBottom: 6, fontWeight: 500}}>Tuntihinta (€/h)</label>
                 <input value={rate} onChange={e => setRate(e.target.value)} type="number" style={inp} placeholder="75" />
@@ -250,51 +306,83 @@ export default function Time() {
           )}
         </div>
 
-        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden'}}>
-          {entries.length === 0 ? (
-            <div style={{padding: '48px', textAlign: 'center', color: 'var(--faint)', fontSize: 14}}>Ei kirjauksia vielä.</div>
-          ) : (
-            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: 13}}>
-              <thead>
-                <tr style={{borderBottom: '1px solid var(--border)'}}>
-                  {[
-                    { label: 'Päivämäärä', mob: false },
-                    { label: 'Projekti',   mob: false },
-                    { label: 'Kuvaus',     mob: true  },
-                    { label: 'Tunnit',     mob: false },
-                    { label: '€/h',        mob: true  },
-                    { label: 'Summa',      mob: false },
-                    { label: '',           mob: false },
-                  ].map(({ label, mob }) => (
-                    <th key={label} className={mob ? 'mob-hide' : ''} style={{textAlign: 'left', padding: '12px 18px', color: 'var(--faint-strong)', fontWeight: 500, fontSize: 12}}>{label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(e => (
-                  <tr key={e.id} style={{borderBottom: '1px solid var(--border-subtle)'}}>
-                    <td style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.date}</td>
-                    <td style={{padding: '13px 18px', fontWeight: 600, color: 'var(--text-soft)'}}>{e.projects?.name}</td>
-                    <td className="mob-hide" style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.description || '—'}</td>
-                    <td style={{padding: '13px 18px', color: 'var(--text-soft)'}}>{e.hours} h</td>
-                    <td className="mob-hide" style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.rate} €</td>
-                    <td style={{padding: '13px 18px', color: '#a78bfa', fontWeight: 600}}>{(e.hours * e.rate).toFixed(0)} €</td>
-                    <td style={{padding: '13px 18px'}}>
-                      <button
-                        onClick={() => deleteEntry(e.id)}
-                        style={{background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 13, padding: 0}}
-                        onMouseOver={ev => (ev.currentTarget.style.color = '#f87171')}
-                        onMouseOut={ev => (ev.currentTarget.style.color = 'var(--faint)')}
-                      >
-                        Poista
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {entries.length === 0 ? (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '48px', textAlign: 'center', color: 'var(--faint)', fontSize: 14 }}>
+            Ei kirjauksia vielä.
+          </div>
+        ) : (() => {
+          const grouped: Record<string, typeof filtered> = {}
+          for (const e of filtered) {
+            if (!grouped[e.date]) grouped[e.date] = []
+            grouped[e.date].push(e)
+          }
+          const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {dates.map(d => {
+                const dayEntries = grouped[d]
+                const dayHours = dayEntries.reduce((s: number, e: any) => s + e.hours, 0)
+                const dayRevenue = dayEntries.reduce((s: number, e: any) => s + e.hours * e.rate, 0)
+                return (
+                  <div key={d}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', letterSpacing: '-0.2px' }}>
+                        {dateLabel(d)}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        {dayHours.toFixed(1)} h · {dayRevenue.toFixed(0)} €
+                      </span>
+                    </div>
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+                      {dayEntries.map((e: any, i: number) => {
+                        const color = projectColor(e.project_id)
+                        return (
+                          <div
+                            key={e.id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: i < dayEntries.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
+                          >
+                            <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 4, background: color, flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-soft)', marginBottom: 2 }}>
+                                {e.projects?.name || '—'}
+                              </div>
+                              {e.description && (
+                                <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {e.description}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              {e.start_time && e.end_time && (
+                                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 2 }}>
+                                  {e.start_time}–{e.end_time}
+                                </div>
+                              )}
+                              <div style={{ fontSize: 14, fontWeight: 700, color: color }}>
+                                {e.hours % 1 === 0 ? e.hours : e.hours.toFixed(1)} h
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 1 }}>
+                                {(e.hours * e.rate).toFixed(0)} €
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => deleteEntry(e.id)}
+                              style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }}
+                              onMouseOver={ev => (ev.currentTarget.style.color = '#f87171')}
+                              onMouseOut={ev => (ev.currentTarget.style.color = 'var(--faint)')}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
       </main>
     </div>
   )
