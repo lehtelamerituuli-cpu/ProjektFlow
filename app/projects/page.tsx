@@ -42,7 +42,11 @@ function DonutChart({ segments, total }: {
 }
 
 
-function GaugeChart({ score, status }: { score: number; status: 'ok' | 'warning' | 'critical' | 'no_data' }) {
+function GaugeChart({ score, status, labels }: {
+  score: number
+  status: 'ok' | 'warning' | 'critical' | 'no_data'
+  labels?: { ok?: string; warning?: string; critical?: string; no_data?: string }
+}) {
   const cx = 90, cy = 78, r = 62, sw = 13
 
   const pt = (deg: number): [number, number] => {
@@ -59,7 +63,8 @@ function GaugeChart({ score, status }: { score: number; status: 'ok' | 'warning'
   const nx = +(cx + nl * Math.cos(needleRad)).toFixed(2)
   const ny = +(cy - nl * Math.sin(needleRad)).toFixed(2)
   const col = status === 'ok' ? '#34d399' : status === 'warning' ? '#fb923c' : status === 'critical' ? '#f87171' : '#6b7280'
-  const lbl = status === 'ok' ? 'Budjetti riittää' : status === 'warning' ? 'Tarkkaile' : status === 'critical' ? 'Ylitysriski' : 'Ei dataa'
+  const defaultLbl = { ok: 'Budjetti riittää', warning: 'Tarkkaile', critical: 'Ylitysriski', no_data: 'Ei dataa' }
+  const lbl = labels?.[status] ?? defaultLbl[status]
 
   return (
     <svg width={180} height={100} style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
@@ -273,6 +278,11 @@ export default function Projects() {
     .filter(p => p.deadline && p.status === 'active')
     .map(p => ({ ...p, daysLeft: Math.ceil((new Date(p.deadline).getTime() - now.getTime()) / 86400000) }))
     .filter(p => p.daysLeft >= 0).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5)
+
+  const nearestDays = upcoming.length > 0 ? upcoming[0].daysLeft : null
+  const deadlineStatus: 'ok' | 'warning' | 'critical' | 'no_data' =
+    nearestDays === null ? 'no_data' : nearestDays < 7 ? 'critical' : nearestDays < 30 ? 'warning' : 'ok'
+  const deadlineScore = nearestDays === null ? 0.5 : Math.max(0, Math.min(1, 1 - nearestDays / 90))
 
   const statusSegments = [
     { label: 'Aktiivinen', color: '#7c3aed', count: activeCount },
@@ -507,41 +517,47 @@ export default function Projects() {
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 18px', color: 'var(--text-heading)' }}>Aikataulu – seuraavat deadlinet</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Aikataulu</h2>
             {upcoming.length === 0 ? (
               <div style={{ color: 'var(--faint)', fontSize: 13 }}>Ei tulevia deadlineja.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {upcoming.map(p => {
-                  const color = COLORS[projects.findIndex(pr => pr.id === p.id) % COLORS.length]
-                  const urgent = p.daysLeft <= 7, soon = p.daysLeft <= 30
-                  return (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${color}18`, border: `1px solid ${color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color }}>
-                        {p.name[0]?.toUpperCase()}
+              <>
+                <GaugeChart
+                  score={deadlineScore}
+                  status={deadlineStatus}
+                  labels={{ ok: 'Aikaa jäljellä', warning: 'Lähestyy', critical: 'Kiireellinen', no_data: 'Ei deadlineja' }}
+                />
+                <div style={{ height: 1, background: 'var(--border)', margin: '12px 0 10px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {upcoming.map(p => {
+                    const urgent = p.daysLeft <= 7, soon = p.daysLeft <= 30
+                    const dColor = urgent ? '#f87171' : soon ? '#fb923c' : '#34d399'
+                    const color = COLORS[projects.findIndex(pr => pr.id === p.id) % COLORS.length]
+                    return (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <div style={{ flex: 1, fontSize: 12, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                        <span style={{ fontSize: 10.5, color: 'var(--muted)', flexShrink: 0 }}>{p.deadline}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: dColor, flexShrink: 0, minWidth: 42, textAlign: 'right' }}>{p.daysLeft} pv</span>
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted-strong)', marginTop: 1 }}>{p.client || '—'}</div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: 12, color: urgent ? '#f87171' : soon ? '#fb923c' : 'var(--muted)' }}>{p.deadline}</div>
-                        <div style={{ fontSize: 11.5, fontWeight: 600, color: urgent ? '#f87171' : '#7c3aed', marginTop: 1 }}>{p.daysLeft} pv</div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Katteet</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Kate</h2>
             {avgKate === null ? (
               <div style={{ color: 'var(--faint)', fontSize: 13 }}>Ei kateprosentteja vielä.</div>
             ) : (
               <>
-                <GaugeChart score={kateScore} status={kateStatus} />
+                <GaugeChart
+                  score={kateScore}
+                  status={kateStatus}
+                  labels={{ ok: 'Hyvä kate', warning: 'Matala kate', critical: 'Negatiivinen kate', no_data: 'Ei katetta' }}
+                />
                 <div style={{ height: 1, background: 'var(--border)', margin: '12px 0 10px' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {viewPw.filter(p => p.kate !== null).map(p => {
