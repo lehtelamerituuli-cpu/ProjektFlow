@@ -264,6 +264,9 @@ export default function Projects() {
   const totalRevenue = viewPw.reduce((s, p) => s + p.revenue + p.expenses, 0)
   const kateVals = viewPw.filter(p => p.kate !== null).map(p => p.kate as number)
   const avgKate = kateVals.length > 0 ? kateVals.reduce((s, v) => s + v, 0) / kateVals.length : null
+  const kateStatus: 'ok' | 'warning' | 'critical' | 'no_data' =
+    avgKate === null ? 'no_data' : avgKate >= 20 ? 'ok' : avgKate >= 0 ? 'warning' : 'critical'
+  const kateScore = avgKate === null ? 0.5 : Math.max(0, Math.min(1, 0.5 - avgKate / 100))
   const budgetPct = totalBudget > 0 ? totalRevenue / totalBudget * 100 : 0
 
   const upcoming = viewProjects
@@ -483,7 +486,7 @@ export default function Projects() {
         </div>
 
         {/* Middle: donut + timeline + bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 18px', color: 'var(--text-heading)' }}>Projektien tila</h2>
@@ -529,6 +532,30 @@ export default function Projects() {
                   )
                 })}
               </div>
+            )}
+          </div>
+
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Katteet</h2>
+            {avgKate === null ? (
+              <div style={{ color: 'var(--faint)', fontSize: 13 }}>Ei kateprosentteja vielä.</div>
+            ) : (
+              <>
+                <GaugeChart score={kateScore} status={kateStatus} />
+                <div style={{ height: 1, background: 'var(--border)', margin: '12px 0 10px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {viewPw.filter(p => p.kate !== null).map(p => {
+                    const kColor = (p.kate ?? 0) >= 20 ? '#34d399' : (p.kate ?? 0) >= 0 ? '#fb923c' : '#f87171'
+                    return (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                        <div style={{ flex: 1, fontSize: 12, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: kColor, flexShrink: 0 }}>{Math.round(p.kate ?? 0)} %</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </div>
 
