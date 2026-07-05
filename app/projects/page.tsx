@@ -41,34 +41,6 @@ function DonutChart({ segments, total }: {
   )
 }
 
-function BarChart({ items }: { items: { label: string; budget: number; revenue: number }[] }) {
-  const maxVal = Math.max(...items.flatMap(i => [i.budget, i.revenue]), 1)
-  const H = 100
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
-        {[['#7c3aed', 'Budjetti (€)'], ['#10b981', 'Toteuma (€)']].map(([c, l]) => (
-          <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)' }}>
-            <div style={{ width: 9, height: 9, borderRadius: 2, background: c }} />{l}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: H }}>
-        {items.slice(0, 5).map((item, i) => (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: H - 18 }}>
-              <div style={{ width: 13, background: '#7c3aed', borderRadius: '3px 3px 0 0', height: Math.max(Math.round(item.budget / maxVal * (H - 18)), item.budget > 0 ? 3 : 0) }} />
-              <div style={{ width: 13, background: '#10b981', borderRadius: '3px 3px 0 0', height: Math.max(Math.round(item.revenue / maxVal * (H - 18)), item.revenue > 0 ? 3 : 0) }} />
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--muted-strong)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 44 }}>
-              {item.label.length > 7 ? item.label.slice(0, 6) + '…' : item.label}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function StatCard({ label, value, sub, icon, iconBg, iconColor, progress, trend }: {
   label: string; value: string | number; sub: string
@@ -201,6 +173,8 @@ export default function Projects() {
     await supabase.auth.signOut(); router.push('/login')
   }
 
+  const now = new Date()
+
   const pw = projects.map((p, i) => {
     const pt  = timeEntries.filter(e => e.project_id === p.id)
     const ptr = travelEntries.filter(e => e.project_id === p.id)
@@ -210,10 +184,41 @@ export default function Projects() {
     const totalUsed = revenue + expenses
     const progress = p.budget > 0 ? Math.min(totalUsed / p.budget * 100, 100) : 0
     const kate = p.budget > 0 ? (p.budget - totalUsed) / p.budget * 100 : null
-    return { ...p, revenue, expenses, progress, kate, color: COLORS[i % COLORS.length] }
-  })
 
-  const now = new Date()
+    // Ennuste: lasketaan päiväkohtainen tahti ja arvioidaan budjetti/deadline-riskit
+    const allDates = ([...pt.map((e: any) => e.date), ...pe.map((e: any) => e.date)] as string[]).filter(Boolean)
+    const earliestStr: string | undefined = allDates.length > 0 ? allDates.sort()[0] : (p.created_at as string | undefined)?.slice(0, 10)
+    const startMs = earliestStr ? new Date(earliestStr).getTime() : now.getTime()
+    const daysActiveF = Math.max(1, (now.getTime() - startMs) / 86400000)
+    const burnRate = totalUsed > 0 ? Math.round(totalUsed / daysActiveF * 10) / 10 : 0
+
+    let projectedAtDeadline: number | null = null
+    let estimatedDoneDate: Date | null = null
+    let forecastStatus: 'ok' | 'warning' | 'critical' | 'no_data' = 'no_data'
+    let daysToCompletion: number | null = null
+
+    if (p.budget > 0 && burnRate > 0) {
+      const remaining = Math.max(0, p.budget - totalUsed)
+      const daysToExhausted = remaining / burnRate
+      estimatedDoneDate = new Date(now.getTime() + daysToExhausted * 86400000)
+      daysToCompletion = Math.round(daysToExhausted)
+      if (p.deadline) {
+        const deadlineMs = new Date(p.deadline).getTime()
+        const daysFromStart = Math.max(1, (deadlineMs - startMs) / 86400000)
+        projectedAtDeadline = Math.round(burnRate * daysFromStart)
+        const ratio = projectedAtDeadline / p.budget
+        forecastStatus = ratio > 1.1 ? 'critical' : ratio > 0.85 ? 'warning' : 'ok'
+      } else {
+        forecastStatus = daysToExhausted < 14 ? 'critical' : daysToExhausted < 45 ? 'warning' : 'ok'
+      }
+    }
+
+    return {
+      ...p, revenue, expenses, progress, kate, color: COLORS[i % COLORS.length],
+      burnRate, projectedAtDeadline, estimatedDoneDate, forecastStatus,
+      daysToCompletion, daysActive: Math.round(daysActiveF),
+    }
+  })
 
   const viewPw = selectedProjectId ? pw.filter(p => p.id === selectedProjectId) : pw
   const viewProjects = selectedProjectId ? projects.filter(p => p.id === selectedProjectId) : projects
@@ -344,6 +349,58 @@ export default function Projects() {
                 </div>
               ))}
             </div>
+            {selectedPw.forecastStatus !== 'no_data' && (
+              <>
+                <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)' }}>Ennuste</span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
+                    background: selectedPw.forecastStatus === 'ok' ? 'rgba(52,211,153,0.12)' : selectedPw.forecastStatus === 'warning' ? 'rgba(251,146,60,0.12)' : 'rgba(248,113,113,0.12)',
+                    color: selectedPw.forecastStatus === 'ok' ? '#34d399' : selectedPw.forecastStatus === 'warning' ? '#fb923c' : '#f87171',
+                  }}>
+                    {selectedPw.forecastStatus === 'ok' ? '✓ Budjetti riittää' : selectedPw.forecastStatus === 'warning' ? '⚠ Tarkkaile budjettia' : '✕ Budjetti ylittyy'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                  <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>Päiväkohtainen tahti</div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{selectedPw.burnRate} €/pv</div>
+                    <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>{selectedPw.daysActive} aktiivista pv</div>
+                  </div>
+                  <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
+                      {selectedPw.projectedAtDeadline !== null ? 'Ennuste deadlineen' : 'Budjettia jäljellä'}
+                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: selectedPw.forecastStatus === 'ok' ? '#34d399' : selectedPw.forecastStatus === 'warning' ? '#fb923c' : '#f87171' }}>
+                      {selectedPw.projectedAtDeadline !== null
+                        ? `${selectedPw.projectedAtDeadline.toLocaleString('fi-FI')} €`
+                        : selectedPw.daysToCompletion !== null ? `${selectedPw.daysToCompletion} pv` : '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>
+                      {selectedPw.projectedAtDeadline !== null && selectedPw.budget > 0
+                        ? `${Math.round(selectedPw.projectedAtDeadline / selectedPw.budget * 100)} % budjetista`
+                        : 'nykyisellä tahdilla'}
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>Valmistumisarvio</div>
+                    {selectedPw.estimatedDoneDate ? (
+                      <>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                          {selectedPw.estimatedDoneDate.toLocaleDateString('fi-FI')}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>
+                          {selectedPw.daysToCompletion !== null && selectedPw.daysToCompletion > 0
+                            ? `${selectedPw.daysToCompletion} pv jäljellä`
+                            : 'Budjetti täynnä'}
+                        </div>
+                      </>
+                    ) : <div style={{ fontSize: 14, color: 'var(--faint)' }}>—</div>}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -431,11 +488,26 @@ export default function Projects() {
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-heading)' }}>Budjetti projekteittain</h2>
-            {pw.length === 0 ? (
-              <div style={{ color: 'var(--faint)', fontSize: 13, marginTop: 14 }}>Ei projekteja.</div>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: 'var(--text-heading)' }}>Projektiriskit</h2>
+            {pw.filter(p => p.status === 'active').length === 0 ? (
+              <div style={{ color: 'var(--faint)', fontSize: 13 }}>Ei aktiivisia projekteja.</div>
             ) : (
-              <BarChart items={pw.map(p => ({ label: p.name, budget: p.budget || 0, revenue: p.revenue }))} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                {pw.filter(p => p.status === 'active').map(p => {
+                  const fcColor = p.forecastStatus === 'ok' ? '#34d399' : p.forecastStatus === 'warning' ? '#fb923c' : p.forecastStatus === 'critical' ? '#f87171' : 'var(--faint-strong)'
+                  const fcLabel = p.forecastStatus === 'ok' ? 'OK' : p.forecastStatus === 'warning' ? 'Tarkkaile' : p.forecastStatus === 'critical' ? 'Ylitysriski' : 'Ei dataa'
+                  return (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: fcColor, flexShrink: 0 }} />
+                      <div style={{ flex: 1, fontSize: 12.5, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: fcColor, flexShrink: 0 }}>{fcLabel}</span>
+                      {p.burnRate > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{p.burnRate} €/pv</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -480,6 +552,7 @@ export default function Projects() {
                     { label: 'Budjetti', mob: false },
                     { label: 'Toteuma',  mob: true  },
                     { label: 'Kate',     mob: true  },
+                    { label: 'Ennuste',  mob: true  },
                     { label: '',         mob: false },
                   ].map(({ label, mob }) => (
                     <th key={label} className={mob ? 'mob-hide' : ''} style={{ textAlign: 'left', padding: '12px 18px', color: 'var(--faint-strong)', fontWeight: 500, fontSize: 12 }}>{label}</th>
@@ -538,6 +611,19 @@ export default function Projects() {
                           </svg>
                         </span>
                       ) : <span style={{ color: 'var(--faint)' }}>—</span>}
+                    </td>
+                    <td className="mob-hide" style={{ padding: '14px 18px' }}>
+                      {p.forecastStatus === 'no_data' ? (
+                        <span style={{ color: 'var(--faint)', fontSize: 12.5 }}>—</span>
+                      ) : (
+                        <span style={{
+                          fontSize: 11.5, fontWeight: 600, padding: '3px 9px', borderRadius: 20,
+                          background: p.forecastStatus === 'ok' ? 'rgba(52,211,153,0.1)' : p.forecastStatus === 'warning' ? 'rgba(251,146,60,0.1)' : 'rgba(248,113,113,0.1)',
+                          color: p.forecastStatus === 'ok' ? '#34d399' : p.forecastStatus === 'warning' ? '#fb923c' : '#f87171',
+                        }}>
+                          {p.forecastStatus === 'ok' ? '✓ OK' : p.forecastStatus === 'warning' ? '⚠ Tarkkaile' : '✕ Riski'}
+                        </span>
+                      )}
                     </td>
                     {isOwner && (
                       <td style={{ padding: '14px 18px', width: 48 }}>

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/app/components/Sidebar'
-import { KM_RATE } from '@/lib/config'
 
 const SELLER_KEY = 'fh_seller_info'
 
@@ -13,7 +12,6 @@ export default function Laskutus() {
   const [user, setUser] = useState<any>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
-  const [travelEntries, setTravelEntries] = useState<any[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [invoiceNumber, setInvoiceNumber] = useState<string>('')
   const [generating, setGenerating] = useState(false)
@@ -87,14 +85,12 @@ export default function Laskutus() {
   }
 
   async function loadData(uid: string) {
-    const [{ data: p }, { data: t }, { data: tr }] = await Promise.all([
+    const [{ data: p }, { data: t }] = await Promise.all([
       supabase.from('projects').select('*').order('name'),
       supabase.from('time_entries').select('*, projects(name,client)').eq('user_id', uid).order('date'),
-      supabase.from('travel_entries').select('*, projects(name,client)').eq('user_id', uid).order('date'),
     ])
     setProjects(p || [])
     setTimeEntries(t || [])
-    setTravelEntries(tr || [])
     if (p && p.length > 0) {
       const first = p[0]
       if (first.client) setBuyerName(first.client)
@@ -113,13 +109,10 @@ export default function Laskutus() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId)
   const filteredTime = selectedProjectId === 'all' ? timeEntries : timeEntries.filter(e => e.project_id === selectedProjectId)
-  const filteredTravel = selectedProjectId === 'all' ? travelEntries : travelEntries.filter(e => e.project_id === selectedProjectId)
 
   const totalHours = filteredTime.reduce((s, e) => s + e.hours, 0)
   const totalIncome = filteredTime.reduce((s, e) => s + e.hours * e.rate, 0)
-  const totalKm = filteredTravel.reduce((s, e) => s + e.km, 0)
-  const totalTravel = totalKm * KM_RATE
-  const grandTotal = totalIncome + totalTravel
+  const grandTotal = totalIncome
   const vatAmount = grandTotal * vatRate
   const grossTotal = grandTotal + vatAmount
 
@@ -254,34 +247,6 @@ export default function Laskutus() {
         doc.text('Aikakirjaukset yhteensa:', 120, y)
         doc.text(totalIncome.toFixed(2) + ' EUR', 188, y, { align: 'right' })
         y += 12
-      }
-
-      // Matkakirjaukset
-      if (filteredTravel.length > 0) {
-        checkPage()
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 50)
-        doc.text('Matkakirjaukset', 20, y); y += 6
-        drawHeader([
-          { label: 'Pvm', x: 23 }, { label: 'Reitti', x: 48 },
-          { label: 'km', x: 148, align: 'right' }, { label: 'e/km', x: 166, align: 'right' }, { label: 'Summa', x: 188, align: 'right' },
-        ])
-        filteredTravel.forEach((e, i) => {
-          checkPage()
-          if (i % 2 === 0) { doc.setFillColor(248, 245, 255); doc.rect(20, y, 170, 7, 'F') }
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(40, 40, 70)
-          doc.text(e.date, 23, y + 5)
-          doc.text((e.route || '').replace(/→/g, '->'), 48, y + 5, { maxWidth: 95 })
-          doc.text(String(e.km), 148, y + 5, { align: 'right' })
-          doc.text(KM_RATE.toFixed(2), 166, y + 5, { align: 'right' })
-          doc.setFont('helvetica', 'bold')
-          doc.text((e.km * KM_RATE).toFixed(2) + ' EUR', 188, y + 5, { align: 'right' })
-          y += 7
-        })
-        doc.setDrawColor(180, 160, 230); doc.line(20, y, 190, y); y += 5
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(79, 46, 180)
-        doc.text('Matkakorvaukset yhteensa:', 120, y)
-        doc.text(totalTravel.toFixed(2) + ' EUR', 188, y, { align: 'right' })
-        y += 14
       }
 
       // ALV-erittely & loppusumma
@@ -420,11 +385,10 @@ export default function Laskutus() {
         </div>
 
         {/* Yhteenveto-kortit */}
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 16}}>
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 16}}>
           {[
             { label: 'Tunnit yhteensä', value: `${totalHours.toFixed(1)} h`, sub: `${filteredTime.length} kirjausta`, color: '#60a5fa' },
             { label: 'Tuntityöt', value: `${totalIncome.toFixed(2)} €`, sub: 'tunnit × tuntihinta', color: '#a78bfa' },
-            { label: 'Matkakorvaukset', value: `${totalTravel.toFixed(2)} €`, sub: `${totalKm} km × ${KM_RATE.toFixed(2).replace('.', ',')} €`, color: '#a78bfa' },
             { label: 'Netto yhteensä', value: `${grandTotal.toFixed(2)} €`, sub: 'ilman ALV:tä', color: '#fff', highlight: true },
           ].map(c => (
             <div key={c.label} style={{
@@ -474,7 +438,7 @@ export default function Laskutus() {
         </div>
 
         {/* Aikakirjaukset */}
-        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 14}}>
+        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden'}}>
           <div style={{padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <h2 style={{fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text-heading)'}}>Aikakirjaukset</h2>
             <span style={{fontSize: 13, color: 'var(--muted)', fontWeight: 500}}>{totalIncome.toFixed(2)} €</span>
@@ -506,37 +470,6 @@ export default function Laskutus() {
           )}
         </div>
 
-        {/* Matkakirjaukset */}
-        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden'}}>
-          <div style={{padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <h2 style={{fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text-heading)'}}>Matkakirjaukset</h2>
-            <span style={{fontSize: 13, color: 'var(--muted)', fontWeight: 500}}>{totalTravel.toFixed(2)} €</span>
-          </div>
-          {filteredTravel.length === 0 ? (
-            <div style={{padding: '32px', textAlign: 'center', color: 'var(--faint)', fontSize: 13}}>Ei matkakirjauksia.</div>
-          ) : (
-            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: 13}}>
-              <thead>
-                <tr style={{borderBottom: '1px solid var(--border)'}}>
-                  {['Päivämäärä','Projekti','Reitti','km','Korvaus'].map(h => (
-                    <th key={h} style={{textAlign: 'left', padding: '12px 18px', color: 'var(--faint-strong)', fontWeight: 500, fontSize: 12}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTravel.map(e => (
-                  <tr key={e.id} style={{borderBottom: '1px solid var(--border-subtle)'}}>
-                    <td style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.date}</td>
-                    <td style={{padding: '13px 18px', fontWeight: 600, color: 'var(--text-soft)'}}>{e.projects?.name}</td>
-                    <td style={{padding: '13px 18px', color: 'var(--muted)'}}>{e.route}</td>
-                    <td style={{padding: '13px 18px', color: 'var(--text-soft)'}}>{e.km} km</td>
-                    <td style={{padding: '13px 18px', color: '#a78bfa', fontWeight: 600}}>{(e.km * KM_RATE).toFixed(2)} €</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
       </main>
     </div>
   )
