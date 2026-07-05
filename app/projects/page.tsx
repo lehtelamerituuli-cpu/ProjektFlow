@@ -560,7 +560,7 @@ export default function Projects() {
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Projektiriskit</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Budjetti</h2>
             {pw.filter(p => p.status === 'active').length === 0 ? (
               <div style={{ color: 'var(--faint)', fontSize: 13 }}>Ei aktiivisia projekteja.</div>
             ) : (
