@@ -64,9 +64,9 @@ function GaugeChart({ score, status }: { score: number; status: 'ok' | 'warning'
   return (
     <svg width={180} height={100} style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
       <path d={arc(1, 179)} fill="none" stroke="var(--border)" strokeWidth={sw} />
-      <path d={arc(3, 57)} fill="none" stroke="#34d399" strokeWidth={sw} opacity={status === 'ok' ? 1 : 0.22} />
-      <path d={arc(63, 117)} fill="none" stroke="#fb923c" strokeWidth={sw} opacity={status === 'warning' ? 1 : 0.22} />
-      <path d={arc(123, 177)} fill="none" stroke="#f87171" strokeWidth={sw} opacity={status === 'critical' ? 1 : 0.22} />
+      <path d={arc(3, 57)} fill="none" stroke="#22c55e" strokeWidth={sw} />
+      <path d={arc(63, 117)} fill="none" stroke="#f59e0b" strokeWidth={sw} />
+      <path d={arc(123, 177)} fill="none" stroke="#ef4444" strokeWidth={sw} />
       <line x1={cx} y1={cy} x2={nx} y2={ny} stroke={col} strokeWidth={2.5} strokeLinecap="round" />
       <circle cx={cx} cy={cy} r={7} fill={col} />
       <circle cx={cx} cy={cy} r={3.5} fill="var(--bg)" />
