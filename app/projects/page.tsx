@@ -42,6 +42,41 @@ function DonutChart({ segments, total }: {
 }
 
 
+function GaugeChart({ score, status }: { score: number; status: 'ok' | 'warning' | 'critical' | 'no_data' }) {
+  const cx = 90, cy = 78, r = 62, sw = 13
+
+  const pt = (deg: number): [number, number] => {
+    const rad = (180 - deg) * Math.PI / 180
+    return [+(cx + r * Math.cos(rad)).toFixed(2), +(cy - r * Math.sin(rad)).toFixed(2)]
+  }
+  const arc = (d1: number, d2: number) => {
+    const [x1, y1] = pt(d1); const [x2, y2] = pt(d2)
+    return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`
+  }
+  const needleDeg = 10 + Math.max(0, Math.min(1, score)) * 160
+  const needleRad = (180 - needleDeg) * Math.PI / 180
+  const nl = r - 10
+  const nx = +(cx + nl * Math.cos(needleRad)).toFixed(2)
+  const ny = +(cy - nl * Math.sin(needleRad)).toFixed(2)
+  const col = status === 'ok' ? '#34d399' : status === 'warning' ? '#fb923c' : status === 'critical' ? '#f87171' : '#6b7280'
+  const lbl = status === 'ok' ? 'Budjetti riittää' : status === 'warning' ? 'Tarkkaile' : status === 'critical' ? 'Ylitysriski' : 'Ei dataa'
+
+  return (
+    <svg width={180} height={100} style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
+      <path d={arc(1, 179)} fill="none" stroke="var(--border)" strokeWidth={sw} />
+      <path d={arc(3, 57)} fill="none" stroke="#34d399" strokeWidth={sw} opacity={status === 'ok' ? 1 : 0.22} />
+      <path d={arc(63, 117)} fill="none" stroke="#fb923c" strokeWidth={sw} opacity={status === 'warning' ? 1 : 0.22} />
+      <path d={arc(123, 177)} fill="none" stroke="#f87171" strokeWidth={sw} opacity={status === 'critical' ? 1 : 0.22} />
+      <line x1={cx} y1={cy} x2={nx} y2={ny} stroke={col} strokeWidth={2.5} strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r={7} fill={col} />
+      <circle cx={cx} cy={cy} r={3.5} fill="var(--bg)" />
+      <text x={16} y={cy + 4} textAnchor="middle" fill="#34d399" fontSize="9" fontFamily="system-ui" opacity="0.7">OK</text>
+      <text x={164} y={cy + 4} textAnchor="middle" fill="#f87171" fontSize="9" fontFamily="system-ui" opacity="0.7">Riski</text>
+      <text x={cx} y={cy + 18} textAnchor="middle" fill={col} fontSize="12" fontWeight="700" fontFamily="system-ui">{lbl}</text>
+    </svg>
+  )
+}
+
 function StatCard({ label, value, sub, icon, iconBg, iconColor, progress, trend }: {
   label: string; value: string | number; sub: string
   icon: React.ReactNode; iconBg: string; iconColor: string
@@ -242,6 +277,16 @@ export default function Projects() {
   ]
 
   const selectedPw = selectedProjectId ? pw.find(p => p.id === selectedProjectId) : null
+
+  const activeWithData = pw.filter(p => p.status === 'active' && p.forecastStatus !== 'no_data')
+  const overallForecastStatus: 'ok' | 'warning' | 'critical' | 'no_data' =
+    activeWithData.length === 0 ? 'no_data' :
+    activeWithData.some(p => p.forecastStatus === 'critical') ? 'critical' :
+    activeWithData.some(p => p.forecastStatus === 'warning') ? 'warning' : 'ok'
+  const forecastScore =
+    overallForecastStatus === 'no_data' ? 0.5 :
+    overallForecastStatus === 'ok' ? 0.15 :
+    overallForecastStatus === 'warning' ? 0.5 : 0.85
 
   const inp: React.CSSProperties = {
     width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
@@ -488,26 +533,28 @@ export default function Projects() {
           </div>
 
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '22px 24px' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: 'var(--text-heading)' }}>Projektiriskit</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 14px', color: 'var(--text-heading)' }}>Projektiriskit</h2>
             {pw.filter(p => p.status === 'active').length === 0 ? (
               <div style={{ color: 'var(--faint)', fontSize: 13 }}>Ei aktiivisia projekteja.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                {pw.filter(p => p.status === 'active').map(p => {
-                  const fcColor = p.forecastStatus === 'ok' ? '#34d399' : p.forecastStatus === 'warning' ? '#fb923c' : p.forecastStatus === 'critical' ? '#f87171' : 'var(--faint-strong)'
-                  const fcLabel = p.forecastStatus === 'ok' ? 'OK' : p.forecastStatus === 'warning' ? 'Tarkkaile' : p.forecastStatus === 'critical' ? 'Ylitysriski' : 'Ei dataa'
-                  return (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: fcColor, flexShrink: 0 }} />
-                      <div style={{ flex: 1, fontSize: 12.5, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: fcColor, flexShrink: 0 }}>{fcLabel}</span>
-                      {p.burnRate > 0 && (
-                        <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{p.burnRate} €/pv</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              <>
+                <GaugeChart score={forecastScore} status={overallForecastStatus} />
+                <div style={{ height: 1, background: 'var(--border)', margin: '12px 0 10px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {pw.filter(p => p.status === 'active').map(p => {
+                    const fcColor = p.forecastStatus === 'ok' ? '#34d399' : p.forecastStatus === 'warning' ? '#fb923c' : p.forecastStatus === 'critical' ? '#f87171' : 'var(--faint-strong)'
+                    const fcLabel = p.forecastStatus === 'ok' ? 'OK' : p.forecastStatus === 'warning' ? 'Tarkkaile' : p.forecastStatus === 'critical' ? 'Ylitysriski' : 'Ei dataa'
+                    return (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: fcColor, flexShrink: 0 }} />
+                        <div style={{ flex: 1, fontSize: 12, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: fcColor, flexShrink: 0 }}>{fcLabel}</span>
+                        {p.burnRate > 0 && <span style={{ fontSize: 10.5, color: 'var(--muted)', flexShrink: 0 }}>{p.burnRate} €/pv</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </div>
         </div>
