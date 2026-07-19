@@ -61,8 +61,8 @@ export default function Time() {
     return () => clearInterval(interval)
   }, [timerRunning, timerStart])
 
-  async function loadEntries(uid: string) {
-    const { data } = await supabase.from('time_entries').select('*, projects(name)').eq('user_id', uid).order('date', { ascending: false })
+  async function loadEntries(_uid: string) {
+    const { data } = await supabase.from('time_entries').select('*, projects(name)').order('date', { ascending: false })
     const loaded = data || []
     setEntries(loaded)
     const rates: Record<string, number> = {}
