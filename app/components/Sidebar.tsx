@@ -166,6 +166,10 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
   const [displayNameInput, setDisplayNameInput] = useState('')
   const [nameLoading, setNameLoading] = useState(false)
   const [nameMsg, setNameMsg] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [companyNameInput, setCompanyNameInput] = useState('')
+  const [companyLoading, setCompanyLoading] = useState(false)
+  const [companyMsg, setCompanyMsg] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
@@ -181,8 +185,9 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
   }, [])
 
   useEffect(() => {
-    supabase.from('profiles').select('display_name').eq('id', user.id).single().then(({ data }) => {
+    supabase.from('profiles').select('display_name, company_name').eq('id', user.id).single().then(({ data }) => {
       if (data?.display_name) { setDisplayName(data.display_name); setDisplayNameInput(data.display_name) }
+      if (data?.company_name) { setCompanyName(data.company_name); setCompanyNameInput(data.company_name) }
     })
   }, [user.id])
 
@@ -193,6 +198,14 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
     setNameLoading(false)
     if (error) setNameMsg('Virhe: ' + error.message)
     else { setDisplayName(displayNameInput.trim()); setNameMsg('Tallennettu!'); setTimeout(() => setNameMsg(''), 2000) }
+  }
+
+  async function saveCompanyName() {
+    setCompanyLoading(true); setCompanyMsg('')
+    const { error } = await supabase.from('profiles').upsert({ id: user.id, company_name: companyNameInput.trim() })
+    setCompanyLoading(false)
+    if (error) setCompanyMsg('Virhe: ' + error.message)
+    else { setCompanyName(companyNameInput.trim()); setCompanyMsg('Tallennettu!'); setTimeout(() => setCompanyMsg(''), 2000) }
   }
 
   useEffect(() => {
@@ -358,9 +371,14 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
             {user?.email?.[0]?.toUpperCase()}
           </div>
           <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, color: 'var(--text-soft)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.email?.split('@')[0]}
+            <div style={{ fontSize: 12.5, color: 'var(--text-soft)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {displayName || user?.email?.split('@')[0]}
             </div>
+            {companyName && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                {companyName}
+              </div>
+            )}
             <div style={{ fontSize: 11, color: 'var(--faint-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
               {user?.email}
             </div>
@@ -442,7 +460,7 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
 
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 16px' }} />
 
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500, marginBottom: 8 }}>Näyttönimi</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
@@ -457,6 +475,23 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
                 </button>
               </div>
               {nameMsg && <p style={{ margin: '6px 0 0', fontSize: 12, color: nameMsg.includes('Virhe') ? '#f87171' : '#34d399' }}>{nameMsg}</p>}
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500, marginBottom: 8 }}>Yrityksen nimi</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={companyNameInput}
+                  onChange={e => setCompanyNameInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveCompanyName()}
+                  placeholder="Yritys Oy"
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}
+                />
+                <button onClick={saveCompanyName} disabled={companyLoading} style={{ padding: '8px 14px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>
+                  {companyLoading ? '...' : 'OK'}
+                </button>
+              </div>
+              {companyMsg && <p style={{ margin: '6px 0 0', fontSize: 12, color: companyMsg.includes('Virhe') ? '#f87171' : '#34d399' }}>{companyMsg}</p>}
             </div>
 
             <button

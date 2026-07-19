@@ -9,6 +9,7 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [isRegister, setIsRegister] = useState(false)
   const [isForgot, setIsForgot] = useState(false)
   const [error, setError] = useState('')
@@ -32,7 +33,7 @@ export default function Login() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName.trim() || email.split('@')[0] } },
+        options: { data: { display_name: displayName.trim() || email.split('@')[0], company_name: companyName.trim() } },
       })
       if (error) { setError(error.message); setLoading(false); return }
       setError('Tarkista sähköpostisi ja vahvista rekisteröinti!')
@@ -59,16 +60,28 @@ export default function Login() {
         </p>
 
         {isRegister && (
-          <div className="mb-4">
-            <label className="text-sm text-gray-400 mb-1 block">Nimesi</label>
-            <input
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              type="text"
-              className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm"
-              placeholder="Matti Meikäläinen"
-            />
-          </div>
+          <>
+            <div className="mb-4">
+              <label className="text-sm text-gray-400 mb-1 block">Nimesi</label>
+              <input
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                type="text"
+                className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm"
+                placeholder="Matti Meikäläinen"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="text-sm text-gray-400 mb-1 block">Yrityksen nimi</label>
+              <input
+                value={companyName}
+                onChange={e => setCompanyName(e.target.value)}
+                type="text"
+                className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm"
+                placeholder="Yritys Oy"
+              />
+            </div>
+          </>
         )}
 
         <div className="mb-4">
