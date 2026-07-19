@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 const IconGrid = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -161,6 +162,10 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
   const [newPw2, setNewPw2] = useState('')
   const [pwMsg, setPwMsg] = useState('')
   const [pwLoading, setPwLoading] = useState(false)
+  const [displayName, setDisplayName] = useState('')
+  const [displayNameInput, setDisplayNameInput] = useState('')
+  const [nameLoading, setNameLoading] = useState(false)
+  const [nameMsg, setNameMsg] = useState('')
 
   useEffect(() => {
     const check = () => {
@@ -172,6 +177,21 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  useEffect(() => {
+    supabase.from('profiles').select('display_name').eq('id', user.id).single().then(({ data }) => {
+      if (data?.display_name) { setDisplayName(data.display_name); setDisplayNameInput(data.display_name) }
+    })
+  }, [user.id])
+
+  async function saveDisplayName() {
+    if (!displayNameInput.trim()) return
+    setNameLoading(true); setNameMsg('')
+    const { error } = await supabase.from('profiles').upsert({ id: user.id, display_name: displayNameInput.trim() })
+    setNameLoading(false)
+    if (error) setNameMsg('Virhe: ' + error.message)
+    else { setDisplayName(displayNameInput.trim()); setNameMsg('Tallennettu!'); setTimeout(() => setNameMsg(''), 2000) }
+  }
 
   useEffect(() => {
     try {
@@ -401,6 +421,23 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
             </div>
 
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 16px' }} />
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500, marginBottom: 8 }}>Näyttönimi</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={displayNameInput}
+                  onChange={e => setDisplayNameInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
+                  placeholder="Etunimi Sukunimi"
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}
+                />
+                <button onClick={saveDisplayName} disabled={nameLoading} style={{ padding: '8px 14px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>
+                  {nameLoading ? '...' : 'OK'}
+                </button>
+              </div>
+              {nameMsg && <p style={{ margin: '6px 0 0', fontSize: 12, color: nameMsg.includes('Virhe') ? '#f87171' : '#34d399' }}>{nameMsg}</p>}
+            </div>
 
             <button
               onClick={() => { setPwSection(v => !v); setPwMsg('') }}

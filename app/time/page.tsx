@@ -27,6 +27,7 @@ export default function Time() {
   const [filterProject, setFilterProject] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [profiles, setProfiles] = useState<Record<string, string>>({})
   const isMobile = useIsMobile()
 
   const TIMER_KEY = 'fh_timer'
@@ -62,9 +63,15 @@ export default function Time() {
   }, [timerRunning, timerStart])
 
   async function loadEntries(_uid: string) {
-    const { data } = await supabase.from('time_entries').select('*, projects(name)').order('date', { ascending: false })
+    const [{ data }, { data: profilesData }] = await Promise.all([
+      supabase.from('time_entries').select('*, projects(name)').order('date', { ascending: false }),
+      supabase.from('profiles').select('id, display_name'),
+    ])
     const loaded = data || []
     setEntries(loaded)
+    const pm: Record<string, string> = {}
+    for (const p of (profilesData || [])) pm[p.id] = p.display_name || ''
+    setProfiles(pm)
     const rates: Record<string, number> = {}
     for (const e of loaded) {
       if (e.project_id && !rates[e.project_id]) rates[e.project_id] = e.rate
@@ -343,8 +350,15 @@ export default function Time() {
                           >
                             <div style={{ width: 3, height: 36, borderRadius: 4, background: color, flexShrink: 0 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-soft)', marginBottom: 2 }}>
-                                {e.projects?.name || '—'}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2, flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-soft)' }}>
+                                  {e.projects?.name || '—'}
+                                </span>
+                                {profiles[e.user_id] && (
+                                  <span style={{ fontSize: 10.5, color: 'var(--muted)', background: 'var(--border)', borderRadius: 5, padding: '1px 6px', fontWeight: 500, flexShrink: 0 }}>
+                                    {profiles[e.user_id]}
+                                  </span>
+                                )}
                               </div>
                               {e.description && (
                                 <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
