@@ -86,7 +86,7 @@ export default function Laskutus() {
 
   async function loadData(uid: string) {
     const [{ data: p }, { data: t }] = await Promise.all([
-      supabase.from('projects').select('*').order('name'),
+      supabase.from('projects').select('*').eq('user_id', uid).order('name'),
       supabase.from('time_entries').select('*, projects(name,client)').eq('user_id', uid).order('date'),
     ])
     setProjects(p || [])

@@ -64,7 +64,7 @@ export default function Time() {
 
   async function loadEntries(_uid: string) {
     const [{ data }, { data: profilesData }] = await Promise.all([
-      supabase.from('time_entries').select('*, projects(name)').order('date', { ascending: false }),
+      supabase.from('time_entries').select('*, projects(name)').eq('user_id', _uid).order('date', { ascending: false }),
       supabase.from('profiles').select('id, display_name'),
     ])
     const loaded = data || []

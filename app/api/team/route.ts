@@ -72,3 +72,32 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ team })
 }
+
+export async function DELETE(request: NextRequest) {
+  const user = await getUser(request)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { userId } = await request.json()
+  if (!userId) return NextResponse.json({ error: 'userId puuttuu' }, { status: 400 })
+
+  // Varmista että pyytäjä on omistaja
+  const { data: ownerMembership } = await supabaseAdmin
+    .from('team_members')
+    .select('team_id')
+    .eq('user_id', user.id)
+    .eq('role', 'owner')
+    .single()
+
+  if (!ownerMembership) return NextResponse.json({ error: 'Et ole tiimin omistaja' }, { status: 403 })
+
+  // Estä omistajan poistaminen
+  if (userId === user.id) return NextResponse.json({ error: 'Et voi poistaa itseäsi' }, { status: 400 })
+
+  await supabaseAdmin
+    .from('team_members')
+    .delete()
+    .eq('user_id', userId)
+    .eq('team_id', ownerMembership.team_id)
+
+  return NextResponse.json({ ok: true })
+}

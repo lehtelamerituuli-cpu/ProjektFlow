@@ -136,6 +136,7 @@ export default function Projects() {
   const [localNotes, setLocalNotes] = useState<Record<string, string>>({})
   const [isOwner, setIsOwner] = useState(true)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [deleteConfirmProject, setDeleteConfirmProject] = useState<{ id: string; name: string } | null>(null)
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -180,6 +181,12 @@ export default function Projects() {
   }
 
   async function deleteProject(id: string) {
+    await Promise.allSettled([
+      supabase.from('time_entries').delete().eq('project_id', id),
+      supabase.from('travel_entries').delete().eq('project_id', id),
+      supabase.from('expenses').delete().eq('project_id', id),
+      supabase.from('project_members').delete().eq('project_id', id),
+    ])
     await supabase.from('projects').delete().eq('id', id)
     setActiveMenu(null); loadAll(user.id)
   }
@@ -321,6 +328,11 @@ export default function Projects() {
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: 'var(--text)', letterSpacing: '-0.5px' }}>{companyName ? `${companyName} projektit` : 'Projektit'}</h1>
             <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Projektit, budjetit ja aikataulut yhdessä näkymässä.</p>
+            {!companyName && (
+              <p style={{ marginTop: 6, fontSize: 12.5, color: '#f59e0b' }}>
+                Yrityksen nimi puuttuu — lisää se asetuksista jotta se näkyy tässä.
+              </p>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 14px', fontSize: 13, color: 'var(--muted)', cursor: 'default' }}>
@@ -744,7 +756,7 @@ export default function Projects() {
                               </button>
                               <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                               <button
-                                onClick={() => deleteProject(p.id)}
+                                onClick={() => { setActiveMenu(null); setDeleteConfirmProject({ id: p.id, name: p.name }) }}
                                 style={{ width: '100%', background: 'none', border: 'none', color: '#f87171', fontSize: 13, cursor: 'pointer', padding: '8px 12px', borderRadius: 7, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
                                 onMouseOver={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}
                                 onMouseOut={e => (e.currentTarget.style.background = 'none')}
@@ -821,6 +833,44 @@ export default function Projects() {
               <button
                 onClick={() => setEditingProject(null)}
                 style={{ padding: '11px 18px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}
+              >
+                Peruuta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Projektin poiston vahvistusmodaali */}
+      {deleteConfirmProject && (
+        <div
+          onClick={() => setDeleteConfirmProject(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '28px', width: 380, maxWidth: '92vw', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}
+          >
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(248,113,113,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </div>
+            <h2 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Poistetaanko projekti?</h2>
+            <p style={{ margin: '0 0 6px', fontSize: 14, color: 'var(--text-soft)', fontWeight: 600 }}>
+              {deleteConfirmProject.name}
+            </p>
+            <p style={{ margin: '0 0 24px', fontSize: 13, color: '#f87171' }}>
+              Tämä poistaa myös kaikki projektin tuntikirjaukset, matkat ja kulut pysyvästi. Toimintoa ei voi peruuttaa.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { deleteProject(deleteConfirmProject.id); setDeleteConfirmProject(null) }}
+                style={{ flex: 1, background: '#ef4444', border: 'none', borderRadius: 10, padding: '10px', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Poista pysyvästi
+              </button>
+              <button
+                onClick={() => setDeleteConfirmProject(null)}
+                style={{ padding: '10px 18px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}
               >
                 Peruuta
               </button>

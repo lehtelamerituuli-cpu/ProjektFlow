@@ -43,3 +43,27 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true })
 }
+
+export async function DELETE(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: { user } } = await supabaseAdmin.auth.getUser(auth.replace('Bearer ', ''))
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { inviteId } = await request.json()
+  if (!inviteId) return NextResponse.json({ error: 'inviteId puuttuu' }, { status: 400 })
+
+  const { data: membership } = await supabaseAdmin
+    .from('team_members')
+    .select('team_id')
+    .eq('user_id', user.id)
+    .eq('role', 'owner')
+    .single()
+
+  if (!membership) return NextResponse.json({ error: 'Et ole tiimin omistaja' }, { status: 403 })
+
+  await supabaseAdmin.from('team_invites').delete().eq('id', inviteId).eq('team_id', membership.team_id)
+
+  return NextResponse.json({ ok: true })
+}

@@ -102,6 +102,11 @@ export default function Receipts() {
   }
 
   async function deleteReceipt(id: string) {
+    const receipt = receipts.find(r => r.id === id)
+    if (receipt?.image_url) {
+      const match = receipt.image_url.match(/\/receipts\/(.+)$/)
+      if (match) await supabase.storage.from('receipts').remove([match[1]])
+    }
     await supabase.from('receipts').delete().eq('id', id)
     loadReceipts(user.id)
   }

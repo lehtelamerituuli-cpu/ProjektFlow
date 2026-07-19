@@ -95,6 +95,51 @@ export default function TeamPage() {
     setCreating(false)
   }
 
+  async function removeMember(userId: string) {
+    if (!token) return
+    const res = await fetch('/api/team', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userId }),
+    })
+    if (res.ok) {
+      setMsg('Jäsen poistettu.')
+      await fetchTeam(token)
+    } else {
+      const data = await res.json()
+      setMsg(data.error || 'Virhe poistamisessa.')
+    }
+  }
+
+  async function revokeInvite(inviteId: string) {
+    if (!token) return
+    await fetch('/api/team/invite', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ inviteId }),
+    })
+    await fetchTeam(token)
+    setMsg('Kutsu peruttu.')
+  }
+
+  async function resendInvite(email: string, inviteId: string) {
+    if (!token) return
+    await revokeInvite(inviteId)
+    setInviteEmail(email)
+    const res = await fetch('/api/team/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ email }),
+    })
+    if (res.ok) {
+      setMsg('Kutsu lähetetty uudelleen!')
+      await fetchTeam(token)
+    } else {
+      const data = await res.json()
+      setMsg(data.error || 'Virhe kutsun lähettämisessä.')
+    }
+  }
+
   async function sendInvite() {
     if (!inviteEmail.trim() || !token) return
     setInviting(true)
@@ -209,6 +254,7 @@ export default function TeamPage() {
                           <>
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem' }}>Tunnit</th>
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem' }}>Tulot</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem' }}></th>
                           </>
                         )}
                       </tr>
@@ -238,6 +284,18 @@ export default function TeamPage() {
                             <>
                               <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text)', fontSize: '0.95rem' }}>{m.totalHours.toFixed(1)} h</td>
                               <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text)', fontSize: '0.95rem' }}>{m.totalIncome.toFixed(2)} €</td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                                {m.role !== 'owner' && (
+                                  <button
+                                    onClick={() => { if (confirm(`Poistetaanko ${profileNames[m.user_id] || m.email} tiimistä?`)) removeMember(m.user_id) }}
+                                    style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: '0.8rem', padding: '2px 6px', borderRadius: 5 }}
+                                    onMouseOver={e => (e.currentTarget.style.color = '#f87171')}
+                                    onMouseOut={e => (e.currentTarget.style.color = 'var(--faint)')}
+                                  >
+                                    Poista
+                                  </button>
+                                )}
+                              </td>
                             </>
                           )}
                         </tr>
@@ -274,11 +332,27 @@ export default function TeamPage() {
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
                     <h3 style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '0.75rem', fontSize: '0.95rem' }}>Odottavat kutsut</h3>
                     {invites.map(inv => (
-                      <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--text)', fontSize: '0.9rem' }}>{inv.email}</span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                          Vanhenee {new Date(inv.expires_at).toLocaleDateString('fi-FI')}
-                        </span>
+                      <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid var(--border)' }}>
+                        <div>
+                          <span style={{ color: 'var(--text)', fontSize: '0.9rem' }}>{inv.email}</span>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2 }}>
+                            Vanhenee {new Date(inv.expires_at).toLocaleDateString('fi-FI')}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => resendInvite(inv.email, inv.id)}
+                            style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontWeight: 500 }}
+                          >
+                            Lähetä uudelleen
+                          </button>
+                          <button
+                            onClick={() => revokeInvite(inv.id)}
+                            style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', borderRadius: 6, border: 'none', background: 'rgba(248,113,113,0.12)', color: '#f87171', cursor: 'pointer', fontWeight: 500 }}
+                          >
+                            Peruuta
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

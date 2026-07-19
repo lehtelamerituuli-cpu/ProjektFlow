@@ -98,16 +98,16 @@ const LogoMark = () => (
 )
 
 const NAV = [
-  { href: '/dashboard',    label: 'Yleiskatsaus',      Icon: IconGrid },
-  { href: '/projects',     label: 'Projektit',         Icon: IconFolder },
-  { href: '/time',         label: 'Tunnit',            Icon: IconClock },
-  { href: '/travel',       label: 'Matkat',            Icon: IconMapPin },
-  { href: '/expenses',     label: 'Kulut',             Icon: IconReceipt },
-  { href: '/laskutus',     label: 'Laskutus',          Icon: IconFileText },
-  { href: '/invoices',     label: 'Laskuhistoria',     Icon: IconHistory },
-  { href: '/receipts',     label: 'Kuitit',            Icon: IconCamera },
-  { href: '/tax',          label: 'Verotus',           Icon: IconPieChart },
-  { href: '/team',         label: 'Tiimi',             Icon: IconUsers },
+  { href: '/dashboard',    label: 'Yleiskatsaus',      Icon: IconGrid,     color: '#7c3aed' },
+  { href: '/projects',     label: 'Projektit',         Icon: IconFolder,   color: '#3b82f6' },
+  { href: '/time',         label: 'Tunnit',            Icon: IconClock,    color: '#10b981' },
+  { href: '/travel',       label: 'Matkat',            Icon: IconMapPin,   color: '#f59e0b' },
+  { href: '/expenses',     label: 'Kulut',             Icon: IconReceipt,  color: '#ef4444' },
+  { href: '/laskutus',     label: 'Laskutus',          Icon: IconFileText, color: '#6366f1' },
+  { href: '/invoices',     label: 'Laskuhistoria',     Icon: IconHistory,  color: '#06b6d4' },
+  { href: '/receipts',     label: 'Kuitit',            Icon: IconCamera,   color: '#ec4899' },
+  { href: '/tax',          label: 'Verotus',           Icon: IconPieChart, color: '#8b5cf6' },
+  { href: '/team',         label: 'Tiimi',             Icon: IconUsers,    color: '#14b8a6' },
 ]
 
 const DARK_VARS: Record<string, string> = {
@@ -250,17 +250,29 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
 
   async function deleteAccount() {
     setDeleteLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/delete-account', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    })
-    if (res.ok) {
-      await supabase.auth.signOut()
-      window.location.href = '/login'
-    } else {
-      const json = await res.json()
-      alert('Virhe: ' + (json.error || 'Tuntematon virhe'))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert('Istunto vanhentunut. Kirjaudu uudelleen ja yritä uudelleen.')
+        setDeleteLoading(false)
+        setDeleteConfirm(false)
+        return
+      }
+      const res = await fetch('/api/delete-account', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (res.ok) {
+        await supabase.auth.signOut()
+        window.location.href = '/login'
+      } else {
+        const json = await res.json().catch(() => ({}))
+        alert('Virhe: ' + (json.error || 'Tuntematon virhe'))
+        setDeleteLoading(false)
+        setDeleteConfirm(false)
+      }
+    } catch (e: any) {
+      alert('Virhe: ' + (e?.message || 'Tuntematon virhe'))
       setDeleteLoading(false)
       setDeleteConfirm(false)
     }
@@ -339,19 +351,21 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {NAV.map(({ href, label, Icon }) => {
+          {NAV.map(({ href, label, Icon, color }) => {
             const active = pathname === href
             return (
               <Link key={href} href={href} onClick={closeMobile} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 12px', borderRadius: 8,
-                color: active ? '#c4b5fd' : 'var(--muted)',
-                background: active ? 'rgba(124,58,237,0.11)' : 'transparent',
+                color: active ? 'var(--text-soft)' : 'var(--muted)',
+                background: active ? `${color}1a` : 'transparent',
                 textDecoration: 'none', fontSize: 13.5,
                 fontWeight: active ? 600 : 400,
-                borderLeft: active ? '2px solid #7c3aed' : '2px solid transparent',
+                borderLeft: active ? `2px solid ${color}` : '2px solid transparent',
               }}>
-                <Icon />
+                <span style={{ color: active ? color : `${color}99`, display: 'flex', alignItems: 'center' }}>
+                  <Icon />
+                </span>
                 {label}
               </Link>
             )
@@ -386,7 +400,7 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 700, color: '#fff',
           }}>
-            {user?.email?.[0]?.toUpperCase()}
+            {(displayName || user?.email || '')[0]?.toUpperCase()}
           </div>
           <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
             <div style={{ fontSize: 12.5, color: 'var(--text-soft)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -14,6 +14,9 @@ export default function Login() {
   const [isForgot, setIsForgot] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registered, setRegistered] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
 
   async function handleSubmit() {
     setLoading(true)
@@ -36,19 +39,58 @@ export default function Login() {
         options: { data: { display_name: displayName.trim() || email.split('@')[0], company_name: companyName.trim() } },
       })
       if (error) { setError(error.message); setLoading(false); return }
-      setError('Tarkista sähköpostisi ja vahvista rekisteröinti!')
+      setRegistered(true)
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setError('Väärä sähköposti tai salasana'); setLoading(false); return }
+      if (error) {
+        if (error.message.toLowerCase().includes('email not confirmed')) {
+          setError('Vahvista sähköpostisi ennen kirjautumista. Tarkista sähköpostisi postilaatikko.')
+          setShowResend(true)
+        } else {
+          setShowResend(false)
+          setError('Väärä sähköposti tai salasana')
+        }
+        setLoading(false)
+        return
+      }
       router.push('/dashboard')
     }
     setLoading(false)
+  }
+
+  async function resendConfirmation() {
+    setResendLoading(true)
+    await supabase.auth.resend({ type: 'signup', email })
+    setResendLoading(false)
+    setError('Uusi vahvistuslinkki lähetetty!')
+    setShowResend(false)
   }
 
   function reset() {
     setIsForgot(false)
     setIsRegister(false)
     setError('')
+  }
+
+  if (registered) {
+    return (
+      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-8">
+        <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-sm text-center">
+          <div className="text-4xl mb-4">📧</div>
+          <h2 className="text-xl font-bold mb-2">Tarkista sähköpostisi</h2>
+          <p className="text-gray-400 text-sm mb-6">
+            Lähetimme vahvistuslinkin osoitteeseen <span className="text-white font-medium">{email}</span>.
+            Avaa linkki ennen kirjautumista.
+          </p>
+          <button
+            onClick={() => { setRegistered(false); setIsRegister(false); setPassword('') }}
+            className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg font-medium transition"
+          >
+            Kirjaudu sisään
+          </button>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -112,9 +154,18 @@ export default function Login() {
         {isForgot && <div className="mb-6" />}
 
         {error && (
-          <p className="text-sm mb-4 text-center" style={{ color: error.includes('lähetetty') || error.includes('Tarkista') ? '#4ade80' : '#f87171' }}>
+          <p className="text-sm mb-2 text-center" style={{ color: error.includes('lähetetty') || error.includes('Tarkista') ? '#4ade80' : '#f87171' }}>
             {error}
           </p>
+        )}
+        {showResend && (
+          <button
+            onClick={resendConfirmation}
+            disabled={resendLoading}
+            className="w-full text-blue-400 hover:text-blue-300 text-sm transition mb-2 disabled:opacity-50"
+          >
+            {resendLoading ? 'Lähetetään...' : 'Lähetä uusi vahvistuslinkki'}
+          </button>
         )}
 
         <button
