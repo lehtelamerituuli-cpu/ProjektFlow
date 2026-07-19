@@ -36,7 +36,7 @@ export default function Time() {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/login'); return }
       setUser(data.user)
-      supabase.from('projects').select('*').eq('user_id', data.user.id).eq('status', 'active').then(({ data: d }) => {
+      supabase.from('projects').select('*').eq('status', 'active').then(({ data: d }) => {
         setProjects(d || [])
         const saved = localStorage.getItem(TIMER_KEY)
         if (saved) {
