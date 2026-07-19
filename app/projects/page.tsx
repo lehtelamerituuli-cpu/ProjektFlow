@@ -118,6 +118,7 @@ function StatCard({ label, value, sub, icon, iconBg, iconColor, progress, trend 
 export default function Projects() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [companyName, setCompanyName] = useState('')
   const [projects, setProjects] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
   const [travelEntries, setTravelEntries] = useState<any[]>([])
@@ -141,6 +142,9 @@ export default function Projects() {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.push('/login'); return }
       setUser(data.user)
+      supabase.from('profiles').select('company_name').eq('id', data.user.id).single().then(({ data: p }) => {
+        if (p?.company_name) setCompanyName(p.company_name)
+      })
       const session = await supabase.auth.getSession()
       const tok = session.data.session?.access_token
       if (tok) {
@@ -315,7 +319,7 @@ export default function Projects() {
         {/* Top bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: 'var(--text)', letterSpacing: '-0.5px' }}>Projektit</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: 'var(--text)', letterSpacing: '-0.5px' }}>{companyName ? `${companyName} projektit` : 'Projektit'}</h1>
             <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>Projektit, budjetit ja aikataulut yhdessä näkymässä.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
