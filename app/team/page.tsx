@@ -27,6 +27,7 @@ export default function TeamPage() {
   const [creating, setCreating] = useState(false)
   const [msg, setMsg] = useState('')
   const [activeTab, setActiveTab] = useState<'members' | 'entries'>('members')
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({})
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -51,6 +52,10 @@ export default function TeamPage() {
     setMembers(data.members || [])
     setInvites(data.invites || [])
     setLoading(false)
+    const { data: profilesData } = await supabase.from('profiles').select('id, display_name')
+    const pm: Record<string, string> = {}
+    for (const p of (profilesData || [])) if (p.display_name) pm[p.id] = p.display_name
+    setProfileNames(pm)
   }, [])
 
   const fetchEntries = useCallback(async (tok: string) => {
@@ -211,7 +216,12 @@ export default function TeamPage() {
                     <tbody>
                       {memberStats.map(m => (
                         <tr key={m.user_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.95rem' }}>{m.email}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.95rem' }}>
+                            {profileNames[m.user_id] || m.email}
+                            {profileNames[m.user_id] && (
+                              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>{m.email}</div>
+                            )}
+                          </td>
                           <td style={{ padding: '0.75rem 1rem' }}>
                             <span style={{
                               padding: '0.2rem 0.6rem',
@@ -296,7 +306,7 @@ export default function TeamPage() {
                       <tbody>
                         {timeEntries.map(e => (
                           <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{memberEmailMap[e.user_id] || e.user_id.slice(0, 8)}</td>
+                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{profileNames[e.user_id] || memberEmailMap[e.user_id] || e.user_id.slice(0, 8)}</td>
                             <td style={{ padding: '0.6rem 1rem', color: 'var(--text)', fontSize: '0.9rem' }}>{new Date(e.date).toLocaleDateString('fi-FI')}</td>
                             <td style={{ padding: '0.6rem 1rem', color: 'var(--text)', fontSize: '0.9rem' }}>{e.projects?.name || '—'}</td>
                             <td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: 'var(--text)', fontSize: '0.9rem' }}>{e.hours} h</td>
@@ -326,7 +336,7 @@ export default function TeamPage() {
                       <tbody>
                         {travelEntries.map(e => (
                           <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{memberEmailMap[e.user_id] || e.user_id.slice(0, 8)}</td>
+                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{profileNames[e.user_id] || memberEmailMap[e.user_id] || e.user_id.slice(0, 8)}</td>
                             <td style={{ padding: '0.6rem 1rem', color: 'var(--text)', fontSize: '0.9rem' }}>{new Date(e.date).toLocaleDateString('fi-FI')}</td>
                             <td style={{ padding: '0.6rem 1rem', color: 'var(--text)', fontSize: '0.9rem' }}>{e.projects?.name || '—'}</td>
                             <td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: 'var(--text)', fontSize: '0.9rem' }}>{e.km} km</td>

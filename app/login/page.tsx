@@ -8,6 +8,7 @@ export default function Login() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [isRegister, setIsRegister] = useState(false)
   const [isForgot, setIsForgot] = useState(false)
   const [error, setError] = useState('')
@@ -28,7 +29,11 @@ export default function Login() {
     }
 
     if (isRegister) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: displayName.trim() || email.split('@')[0] } },
+      })
       if (error) { setError(error.message); setLoading(false); return }
       setError('Tarkista sähköpostisi ja vahvista rekisteröinti!')
     } else {
@@ -52,6 +57,19 @@ export default function Login() {
         <p className="text-gray-400 text-sm mb-8">
           {isForgot ? 'Nollaa salasana' : isRegister ? 'Luo uusi tili' : 'Kirjaudu sisään'}
         </p>
+
+        {isRegister && (
+          <div className="mb-4">
+            <label className="text-sm text-gray-400 mb-1 block">Nimesi</label>
+            <input
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              type="text"
+              className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm"
+              placeholder="Matti Meikäläinen"
+            />
+          </div>
+        )}
 
         <div className="mb-4">
           <label className="text-sm text-gray-400 mb-1 block">Sähköposti</label>
