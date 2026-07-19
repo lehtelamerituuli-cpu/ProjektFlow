@@ -80,6 +80,7 @@ export default function Dashboard() {
   const now = new Date()
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [displayName, setDisplayName] = useState('')
   const [projects, setProjects] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
   const [travelEntries, setTravelEntries] = useState<any[]>([])
@@ -93,6 +94,9 @@ export default function Dashboard() {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/login'); return }
       setUser(data.user)
+      supabase.from('profiles').select('display_name').eq('id', data.user.id).single().then(({ data: p }) => {
+        if (p?.display_name) setDisplayName(p.display_name)
+      })
       Promise.all([
         supabase.from('projects').select('*').eq('user_id', data.user.id),
         supabase.from('time_entries').select('*').eq('user_id', data.user.id),
@@ -169,7 +173,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-              Hei, {user?.email?.split('@')[0]}!
+              Hei, {displayName || user?.email?.split('@')[0]}!
             </h1>
             <p style={{ color: 'var(--muted-strong)', marginTop: 5, fontSize: 13.5 }}>
               Kuukauden tulot, tunnit ja projektien tila yhdellä silmäyksellä.
