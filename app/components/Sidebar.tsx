@@ -172,6 +172,7 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
   const [companyMsg, setCompanyMsg] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [isTeamMember, setIsTeamMember] = useState(false)
 
   useEffect(() => {
     const check = () => {
@@ -185,10 +186,27 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
   }, [])
 
   useEffect(() => {
-    supabase.from('profiles').select('display_name, company_name').eq('id', user.id).single().then(({ data }) => {
-      if (data?.display_name) { setDisplayName(data.display_name); setDisplayNameInput(data.display_name) }
-      if (data?.company_name) { setCompanyName(data.company_name); setCompanyNameInput(data.company_name) }
-    })
+    async function loadProfile() {
+      const [{ data: profile }, { data: membership }] = await Promise.all([
+        supabase.from('profiles').select('display_name, company_name').eq('id', user.id).single(),
+        supabase.from('team_members').select('role, teams(owner_id)').eq('user_id', user.id).single(),
+      ])
+      if (profile?.display_name) { setDisplayName(profile.display_name); setDisplayNameInput(profile.display_name) }
+
+      const role = membership?.role
+      const ownerTeam = membership?.teams as any
+
+      if (role === 'member' && ownerTeam?.owner_id) {
+        setIsTeamMember(true)
+        const { data: ownerProfile } = await supabase
+          .from('profiles').select('company_name').eq('id', ownerTeam.owner_id).single()
+        const cn = ownerProfile?.company_name || ''
+        setCompanyName(cn)
+      } else {
+        if (profile?.company_name) { setCompanyName(profile.company_name); setCompanyNameInput(profile.company_name) }
+      }
+    }
+    loadProfile()
   }, [user.id])
 
   async function saveDisplayName() {
@@ -479,19 +497,28 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
 
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500, marginBottom: 8 }}>Yrityksen nimi</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  value={companyNameInput}
-                  onChange={e => setCompanyNameInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveCompanyName()}
-                  placeholder="Yritys Oy"
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}
-                />
-                <button onClick={saveCompanyName} disabled={companyLoading} style={{ padding: '8px 14px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>
-                  {companyLoading ? '...' : 'OK'}
-                </button>
-              </div>
-              {companyMsg && <p style={{ margin: '6px 0 0', fontSize: 12, color: companyMsg.includes('Virhe') ? '#f87171' : '#34d399' }}>{companyMsg}</p>}
+              {isTeamMember ? (
+                <div style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--border)', color: 'var(--muted)', fontSize: 13 }}>
+                  {companyName || '—'}
+                  <span style={{ fontSize: 11, color: 'var(--faint)', marginLeft: 8 }}>(vain esimies voi muuttaa)</span>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={companyNameInput}
+                      onChange={e => setCompanyNameInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && saveCompanyName()}
+                      placeholder="Yritys Oy"
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}
+                    />
+                    <button onClick={saveCompanyName} disabled={companyLoading} style={{ padding: '8px 14px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>
+                      {companyLoading ? '...' : 'OK'}
+                    </button>
+                  </div>
+                  {companyMsg && <p style={{ margin: '6px 0 0', fontSize: 12, color: companyMsg.includes('Virhe') ? '#f87171' : '#34d399' }}>{companyMsg}</p>}
+                </>
+              )}
             </div>
 
             <button
