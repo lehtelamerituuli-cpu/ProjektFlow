@@ -166,6 +166,8 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
   const [displayNameInput, setDisplayNameInput] = useState('')
   const [nameLoading, setNameLoading] = useState(false)
   const [nameMsg, setNameMsg] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     const check = () => {
@@ -213,6 +215,24 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
     setPwLoading(false)
     if (error) { setPwMsg('Virhe: ' + error.message) }
     else { setPwMsg('Salasana vaihdettu!'); setNewPw(''); setNewPw2(''); setTimeout(() => setPwSection(false), 1500) }
+  }
+
+  async function deleteAccount() {
+    setDeleteLoading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/delete-account', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+    if (res.ok) {
+      await supabase.auth.signOut()
+      window.location.href = '/login'
+    } else {
+      const json = await res.json()
+      alert('Virhe: ' + (json.error || 'Tuntematon virhe'))
+      setDeleteLoading(false)
+      setDeleteConfirm(false)
+    }
   }
 
   function selectTheme(theme: 'dark' | 'light') {
@@ -471,6 +491,38 @@ export function Sidebar({ user, onLogout }: { user: any; onLogout: () => void })
               <IconLogout />
               Kirjaudu ulos
             </button>
+
+            {!deleteConfirm ? (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                style={{ width: '100%', marginTop: 10, padding: '8px', background: 'none', border: 'none', color: 'var(--faint)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Poista tili ja kaikki tiedot
+              </button>
+            ) : (
+              <div style={{ marginTop: 12, padding: '14px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <p style={{ margin: '0 0 10px', fontSize: 12.5, color: '#f87171', fontWeight: 600 }}>Varoitus: tämä poistaa pysyvästi</p>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+                  Kaikki projektit, työtunnit, kulut ja tilisi poistetaan eikä niitä voi palauttaa.
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={deleteAccount}
+                    disabled={deleteLoading}
+                    style={{ flex: 1, padding: '9px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, opacity: deleteLoading ? 0.6 : 1 }}
+                  >
+                    {deleteLoading ? 'Poistetaan...' : 'Poista kaikki'}
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(false)}
+                    disabled={deleteLoading}
+                    style={{ padding: '9px 14px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}
+                  >
+                    Peruuta
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
