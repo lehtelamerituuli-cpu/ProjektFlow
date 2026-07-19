@@ -135,11 +135,6 @@ export default function Projects() {
   const [localNotes, setLocalNotes] = useState<Record<string, string>>({})
   const [isOwner, setIsOwner] = useState(true)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [projectMembers, setProjectMembers] = useState<Record<string, { user_id: string; display_name: string; role: string }[]>>({})
-  const [pageProfiles, setPageProfiles] = useState<Record<string, string>>({})
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteMsg, setInviteMsg] = useState('')
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -171,51 +166,6 @@ export default function Projects() {
     const notes: Record<string, string> = {}
     for (const proj of (p || [])) notes[proj.id] = proj.notes || ''
     setLocalNotes(notes)
-
-    const [{ data: membersRaw }, { data: profilesRaw }] = await Promise.all([
-      supabase.from('project_members').select('project_id, user_id, role'),
-      supabase.from('profiles').select('id, display_name'),
-    ])
-    const profileMap: Record<string, string> = {}
-    for (const pr of (profilesRaw || [])) profileMap[pr.id] = pr.display_name || ''
-    setPageProfiles(profileMap)
-    const membersMap: Record<string, { user_id: string; display_name: string; role: string }[]> = {}
-    for (const m of (membersRaw || [])) {
-      if (!membersMap[m.project_id]) membersMap[m.project_id] = []
-      membersMap[m.project_id].push({ user_id: m.user_id, display_name: profileMap[m.user_id] || '', role: m.role })
-    }
-    setProjectMembers(membersMap)
-  }
-
-  async function inviteMember(projectId: string) {
-    if (!inviteEmail.trim()) return
-    setInviteLoading(true); setInviteMsg('')
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/invite-member', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ email: inviteEmail.trim(), project_id: projectId }),
-    })
-    const json = await res.json()
-    setInviteLoading(false)
-    if (!res.ok) { setInviteMsg(json.error || 'Virhe'); return }
-    setInviteMsg(`${json.display_name} lisätty!`)
-    setInviteEmail('')
-    setTimeout(() => setInviteMsg(''), 3000)
-    if (user) loadAll(user.id)
-  }
-
-  async function removeMember(projectId: string, userId: string) {
-    const { data: { session } } = await supabase.auth.getSession()
-    await fetch('/api/invite-member', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ project_id: projectId, user_id: userId }),
-    })
-    setProjectMembers(prev => ({
-      ...prev,
-      [projectId]: (prev[projectId] || []).filter(m => m.user_id !== userId),
-    }))
   }
 
   async function addProject() {
@@ -510,58 +460,6 @@ export default function Projects() {
               </>
             )}
 
-            {/* Jäsenet */}
-            {selectedPw.user_id === user?.id && (
-              <>
-                <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 10 }}>Jäsenet</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: `${selectedPw.color}22`, color: selectedPw.color, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {(pageProfiles[selectedPw.user_id] || user?.email || 'O')[0]?.toUpperCase()}
-                    </div>
-                    <span style={{ fontSize: 12.5, color: 'var(--text-soft)', flex: 1 }}>{pageProfiles[selectedPw.user_id] || user?.email}</span>
-                    <span style={{ fontSize: 10.5, color: '#a78bfa', background: 'rgba(167,139,250,0.12)', padding: '2px 7px', borderRadius: 5, fontWeight: 600 }}>omistaja</span>
-                  </div>
-                  {(projectMembers[selectedPw.id] || []).map(m => (
-                    <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--border)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexShrink: 0 }}>
-                        {(m.display_name || '?')[0]?.toUpperCase()}
-                      </div>
-                      <span style={{ fontSize: 12.5, color: 'var(--text-soft)', flex: 1 }}>{m.display_name || m.user_id.slice(0, 8)}</span>
-                      <button
-                        onClick={() => removeMember(selectedPw.id, m.user_id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
-                        onMouseOver={e => (e.currentTarget.style.color = '#f87171')}
-                        onMouseOut={e => (e.currentTarget.style.color = 'var(--faint)')}
-                        title="Poista jäsen"
-                      >×</button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    value={inviteEmail}
-                    onChange={e => setInviteEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && inviteMember(selectedPw.id)}
-                    placeholder="sähköposti@esimerkki.fi"
-                    style={{ flex: 1, padding: '8px 11px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-soft)', fontSize: 12.5, fontFamily: 'system-ui' }}
-                  />
-                  <button
-                    onClick={() => inviteMember(selectedPw.id)}
-                    disabled={inviteLoading || !inviteEmail.trim()}
-                    style={{ padding: '8px 16px', background: 'var(--accent, #7c3aed)', color: '#fff', border: 'none', borderRadius: 8, cursor: inviteLoading || !inviteEmail.trim() ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 600, flexShrink: 0, opacity: inviteLoading || !inviteEmail.trim() ? 0.5 : 1 }}
-                  >
-                    {inviteLoading ? '...' : 'Kutsu'}
-                  </button>
-                </div>
-                {inviteMsg && (
-                  <p style={{ margin: '6px 0 0', fontSize: 12, color: inviteMsg.includes('Virhe') || inviteMsg.includes('ei löydy') || inviteMsg.includes('jo') ? '#f87171' : '#34d399' }}>
-                    {inviteMsg}
-                  </p>
-                )}
-              </>
-            )}
           </div>
         )}
 
